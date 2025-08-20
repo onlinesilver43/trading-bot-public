@@ -7,7 +7,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: SSH deploy
+
+      # create a tarball (exclude data/logs)
+      - name: Package repo
+        run: tar -czf package.tgz --exclude='.git' --exclude='data' --exclude='logs' .
+
+      # upload to droplet
+      - name: Upload to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          source: "package.tgz"
+          target: "/srv/trading-bots-repo"
+
+      # deploy on droplet (no apt installs, no git clone)
+      - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.TB_HOST }}
@@ -15,15 +31,12 @@ jobs:
           password: ${{ secrets.TB_PASS }}
           script: |
             set -e
-            sudo apt-get update -y && sudo apt-get install -y git rsync docker.io || true
-            CLONE_DIR=/srv/trading-bots-repo
-            APP_DIR=/srv/trading-bots
-            if [ ! -d "$CLONE_DIR/.git" ]; then
-              rm -rf "$CLONE_DIR"
-              git clone https://github.com/${{ github.repository }} "$CLONE_DIR"
-            else
-              git -C "$CLONE_DIR" fetch --all
-              git -C "$CLONE_DIR" reset --hard origin/main
-            fi
-            rsync -a --delete --exclude data --exclude logs "$CLONE_DIR"/ "$APP_DIR"/
-            docker compose -f "$APP_DIR/compose/docker-compose.yml" up -d --build
+            export DEBIAN_FRONTEND=noninteractive
+            mkdir -p /srv/trading-bots-repo /srv/trading-bots
+            cd /srv/trading-bots-repo
+            # unpack uploaded artifact
+            tar -xzf package.tgz
+            # sync to live dir (keep data/logs)
+            rsync -a --delete --exclude data --exclude logs /srv/trading-bots-repo/ /srv/trading-bots/
+            # rebuild/restart
+            docker compose -f /srv/trading-bots/compose/docker-compose.yml up -d --build
