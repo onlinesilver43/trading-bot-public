@@ -7,12 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # create a tarball (exclude data/logs)
-      - name: Package repo
-        run: tar -czf package.tgz --exclude='.git' --exclude='data' --exclude='logs' .
+      # Pack EXACTLY what's in the commit (no .git, no changing files)
+      - name: Package repo (git archive)
+        run: git archive --format=tar.gz -o package.tgz HEAD
 
-      # upload to droplet
       - name: Upload to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -22,21 +23,18 @@ jobs:
           source: "package.tgz"
           target: "/srv/trading-bots-repo"
 
-      # deploy on droplet (no apt installs, no git clone)
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.TB_HOST }}
           username: ${{ secrets.TB_USER }}
           password: ${{ secrets.TB_PASS }}
+        # unpack -> sync into live dir -> rebuild
           script: |
             set -e
-            export DEBIAN_FRONTEND=noninteractive
             mkdir -p /srv/trading-bots-repo /srv/trading-bots
             cd /srv/trading-bots-repo
-            # unpack uploaded artifact
             tar -xzf package.tgz
-            # sync to live dir (keep data/logs)
+            rm -f package.tgz
             rsync -a --delete --exclude data --exclude logs /srv/trading-bots-repo/ /srv/trading-bots/
-            # rebuild/restart
             docker compose -f /srv/trading-bots/compose/docker-compose.yml up -d --build
