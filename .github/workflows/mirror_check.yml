@@ -1,0 +1,27 @@
+name: Mirror Token Check
+on: { workflow_dispatch: {} }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - name: Validate PAT can access mirror
+        env:
+          TOKEN: ${{ secrets.MIRROR_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -e
+          echo "Token length: ${#TOKEN}"              # will show a number (>0)
+          echo "Who am I?"
+          curl -s -H "Authorization: token $TOKEN" https://api.github.com/user | jq -r '.login'
+          echo "Repo access HTTP code (200=ok):"
+          curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: token $TOKEN" https://api.github.com/repos/$OWNER/trading-bot-public
+          echo "git ls-remote (read test):"
+          git ls-remote "https://x-access-token:${TOKEN}@github.com/$OWNER/trading-bot-public.git" | head || true
+          echo "push+delete temp tag (write test):"
+          git config user.name "mirror-check"; git config user.email "mirror-check@users.noreply.github.com"
+          TAG="_mirror_check_${GITHUB_RUN_ID}"
+          git tag "$TAG" || true
+          git push "https://x-access-token:${TOKEN}@github.com/$OWNER/trading-bot-public.git" "refs/tags/$TAG" -f
+          git push "https://x-access-token:${TOKEN}@github.com/$OWNER/trading-bot-public.git" ":refs/tags/$TAG"
