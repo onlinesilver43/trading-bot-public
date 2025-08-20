@@ -8,11 +8,11 @@ services:
       - ../.env
     environment:
       EXCHANGE: "binanceus"
-      SYMBOL: "BTC/USDT"     # if you see InvalidSymbol, try "BTC/USD"
-      TIMEFRAME: "1m"
+      SYMBOL: "BTC/USD"     # if you see InvalidSymbol, try "BTC/USD"
+      TIMEFRAME: "5m"
       FAST: "7"
       SLOW: "25"
-      ORDER_SIZE_USD: "100"
+      ORDER_SIZE_USD: "50"
       LOOP_SECONDS: "20"
       STATE_PATH: "/data/paper_state.json"
       TRADES_PATH: "/data/paper_trades.json"
