@@ -1,1 +1,1 @@
-New goal text
+Phase 1 live (BTC bot + UI via CI). Today: add second paper bot (ETH/USD 5m), confirm auto-deploy, and add simple UI pair display.
