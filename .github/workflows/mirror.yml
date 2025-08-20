@@ -3,14 +3,22 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch: {}
+permissions:
+  contents: read
 jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - name: Push to public mirror
+        with:
+          fetch-depth: 0
+          persist-credentials: false   # don't use GITHUB_TOKEN
+      - name: Configure git remote to public mirror (with PAT)
         run: |
           git config user.name "mirror-bot"
           git config user.email "mirror-bot@users.noreply.github.com"
-          git push --force --prune https://${{ secrets.MIRROR_TOKEN }}@github.com/${{ github.repository_owner }}/trading-bot-public.git HEAD:main
+          git remote remove public 2>/dev/null || true
+          git remote add public "https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/${{ github.repository_owner }}/trading-bot-public.git"
+          git config --global http.https://github.com/.extraheader ""  # ensure no GITHUB_TOKEN header
+      - name: Push to mirror
+        run: git push --force --prune public HEAD:main
