@@ -8,7 +8,7 @@ services:
       EXCHANGE: "binance"
       SYMBOL: "BTC/USDT"
       TIMEFRAME: "1m"
-      FAST: "7"
+      FAST: "10"
       SLOW: "25"
       ORDER_SIZE_USD: "100"
       LOOP_SECONDS: "20"
