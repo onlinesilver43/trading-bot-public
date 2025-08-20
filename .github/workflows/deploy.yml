@@ -35,9 +35,9 @@ jobs:
             cd /srv/trading-bots-repo
             tar -xzf package.tgz && rm -f package.tgz
 
-            # sync repo -> live (keep data/logs and .env)
-            rsync -a --delete \
-              --exclude data --exclude logs --exclude .env \
+            # sync repo -> live (keep data/logs/.env and ignore diag)
+            rsync -a --delete --delete-delay --force \
+              --exclude data --exclude logs --exclude .env --exclude _diag/ \
               /srv/trading-bots-repo/ /srv/trading-bots/
 
             # write .env AFTER rsync so --delete won't remove it
