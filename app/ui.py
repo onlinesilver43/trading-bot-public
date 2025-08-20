@@ -2,11 +2,17 @@ import os, json, io, zipfile
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
-DATA_DIR  = os.getenv("DATA_DIR", "/data")
-STATE_PATH  = os.getenv("STATE_PATH", os.path.join(DATA_DIR, "paper_state.json"))
-TRADES_PATH = os.getenv("TRADES_PATH", os.path.join(DATA_DIR, "paper_trades.json"))
+# Data mount (read-only)
+DATA_DIR   = os.getenv("DATA_DIR", "/data")
+STATE_PATH = os.getenv("STATE_PATH", os.path.join(DATA_DIR, "paper_state.json"))
+TRADES_PATH= os.getenv("TRADES_PATH", os.path.join(DATA_DIR, "paper_trades.json"))
 
-FILES = [
+# Host mounts (read-only) for source export
+HOST_APP      = os.getenv("HOST_APP", "/host_app")             # /srv/trading-bots/app
+HOST_COMPOSE  = os.getenv("HOST_COMPOSE", "/host_compose")     # /srv/trading-bots/compose
+HOST_GITHUB   = os.getenv("HOST_GITHUB", "/host_github")       # /srv/trading-bots/.github
+
+DIAG_FILES = [
     "paper_state.json",
     "paper_trades.json",
     "trades_detailed.json",
@@ -19,8 +25,28 @@ app = FastAPI()
 
 def load(path, default):
     try:
-        with open(path, "r") as f: return json.load(f)
+        with open(path, "r", encoding="utf-8") as f: return json.load(f)
     except Exception: return default
+
+def zip_dirs(pairs, zip_name: str):
+    present_any = False
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as z:
+        for label, root in pairs:
+            if not root or not os.path.isdir(root): continue
+            present_any = True
+            for dirpath, dirnames, filenames in os.walk(root):
+                # skip typical junk
+                dirnames[:] = [d for d in dirnames if d not in ("__pycache__", ".git")]
+                for fn in filenames:
+                    if fn.endswith((".pyc",".pyo",".DS_Store")): continue
+                    full = os.path.join(dirpath, fn)
+                    rel = os.path.relpath(full, root)
+                    z.write(full, arcname=os.path.join(zip_name, label, rel))
+    if not present_any:
+        return None
+    buf.seek(0)
+    return buf
 
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -41,8 +67,10 @@ th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;le
 </style>
 </head><body>
 <h1>Trading Bots – Status <span class="muted" id="updated"></span></h1>
+
 <div style="margin:0 0 16px;">
   <a class="btn" href="/api/export.zip">Export Diagnostics (ZIP)</a>
+  &nbsp; <a class="btn" href="/api/source.zip">Export Source (ZIP)</a>
   &nbsp; <a href="/exports">Exports</a>
 </div>
 
@@ -112,7 +140,6 @@ function render(state){
       <td>${num(x.coin_units,6)}</td>
     </tr>`).join('');
 }
-
 async function load(){ const r=await fetch('/api/state'); render(await r.json()); }
 load(); setInterval(load, 2000);
 </script></body></html>
@@ -122,7 +149,7 @@ load(); setInterval(load, 2000);
 @app.get("/exports", response_class=HTMLResponse)
 def exports_page():
     rows=[]
-    for fn in FILES:
+    for fn in DIAG_FILES:
         p=os.path.join(DATA_DIR, fn)
         exists=os.path.isfile(p)
         size=os.path.getsize(p) if exists else 0
@@ -132,14 +159,14 @@ def exports_page():
     <title>Exports</title>
     <style>body{{font:14px system-ui;margin:20px}} table{{border-collapse:collapse}} td,th{{padding:8px 12px;border:1px solid #ccc}}</style>
     <h2>Exports</h2>
-    <p><a href="/api/export.zip">Export Diagnostics (ZIP)</a></p>
+    <p><a href="/api/export.zip">Export Diagnostics (ZIP)</a> &nbsp; <a href="/api/source.zip">Export Source (ZIP)</a></p>
     <table><tr><th>File</th><th>Exists</th><th>Size (bytes)</th></tr>{rows_html}</table>
     </html>"""
     return HTMLResponse(html)
 
 @app.get("/exports/view/{name}", response_class=HTMLResponse)
 def view_json(name: str):
-    if name not in FILES: raise HTTPException(404, "Unknown file")
+    if name not in DIAG_FILES: raise HTTPException(404, "Unknown file")
     p=os.path.join(DATA_DIR, name)
     if not os.path.isfile(p): raise HTTPException(404, f"{name} not found")
     try:
@@ -158,7 +185,7 @@ def api_state():
 @app.get("/api/export.zip")
 def api_export_zip():
     present=[]
-    for fn in FILES:
+    for fn in DIAG_FILES:
         p=os.path.join(DATA_DIR, fn)
         if os.path.isfile(p): present.append((fn,p))
     if not present:
@@ -169,4 +196,17 @@ def api_export_zip():
             z.write(p, arcname=fn)
     buf.seek(0)
     headers={"Content-Disposition": 'attachment; filename="trading-bot-export.zip"'}
+    return StreamingResponse(buf, media_type="application/zip", headers=headers)
+
+@app.get("/api/source.zip")
+def api_source_zip():
+    pairs = [
+        ("app",      HOST_APP if os.path.isdir(HOST_APP) else None),
+        ("compose",  HOST_COMPOSE if os.path.isdir(HOST_COMPOSE) else None),
+        (".github",  os.path.join(HOST_GITHUB, "workflows") if os.path.isdir(os.path.join(HOST_GITHUB, "workflows")) else None),
+    ]
+    buf = zip_dirs(pairs, "trading-bot-source")
+    if buf is None:
+        raise HTTPException(status_code=404, detail="No source directories are mounted in UI container.")
+    headers={"Content-Disposition": 'attachment; filename="trading-bot-source.zip"'}
     return StreamingResponse(buf, media_type="application/zip", headers=headers)
