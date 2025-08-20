@@ -4,11 +4,13 @@ services:
     image: tb-app:latest
     container_name: tb-bot
     command: ["python","/app/bot.py"]
+    env_file:
+      - ../.env
     environment:
-      EXCHANGE: "binance"
-      SYMBOL: "BTC/USDT"
+      EXCHANGE: "binanceus"
+      SYMBOL: "BTC/USDT"     # if you see InvalidSymbol, try "BTC/USD"
       TIMEFRAME: "1m"
-      FAST: "10"
+      FAST: "7"
       SLOW: "25"
       ORDER_SIZE_USD: "100"
       LOOP_SECONDS: "20"

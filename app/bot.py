@@ -1,8 +1,8 @@
-import os, time, json, math
+import os, time, json
 from datetime import datetime, timezone
 import ccxt
 
-EXCHANGE  = os.getenv("EXCHANGE", "binance")
+EXCHANGE  = os.getenv("EXCHANGE", "binanceus")
 SYMBOL    = os.getenv("SYMBOL", "BTC/USDT")
 TIMEFRAME = os.getenv("TIMEFRAME", "1m")
 FAST      = int(os.getenv("FAST", "7"))
@@ -34,20 +34,24 @@ def sma(vals, n):
     return sum(vals[-n:]) / n
 
 def main():
+    # pick up API keys if provided (works for binanceus)
+    api_key = os.getenv("BINANCE_API_KEY") or os.getenv("API_KEY")
+    api_sec = os.getenv("BINANCE_API_SECRET") or os.getenv("API_SECRET")
+    params = {"enableRateLimit": True}
+    if api_key and api_sec:
+        params.update({"apiKey": api_key, "secret": api_sec})
+
     exchange_class = getattr(ccxt, EXCHANGE)
-    ex = exchange_class({"enableRateLimit": True})
+    ex = exchange_class(params)
+
     state = load_json(STATE_PATH, {
-        "symbol": SYMBOL,
-        "position": "flat",
-        "entry_price": None,
-        "units": 0.0,
-        "pnl_usd": 0.0,
-        "last_signal": "none",
+        "symbol": SYMBOL, "position": "flat", "entry_price": None,
+        "units": 0.0, "pnl_usd": 0.0, "last_signal": "none",
         "updated_at": now_iso()
     })
     trades = load_json(TRADES_PATH, [])
 
-    print(f"[bot] starting paper bot on {EXCHANGE}:{SYMBOL} {TIMEFRAME} FAST={FAST} SLOW={SLOW}", flush=True)
+    print(f"[bot] start {EXCHANGE}:{SYMBOL} tf={TIMEFRAME} FAST={FAST} SLOW={SLOW}", flush=True)
 
     while True:
         try:
@@ -56,20 +60,11 @@ def main():
             last = closes[-1]
             s_fast = sma(closes, FAST)
             s_slow = sma(closes, SLOW)
-            signal = "none"
-            if s_fast and s_slow:
-                if s_fast > s_slow:
-                    signal = "buy"
-                elif s_fast < s_slow:
-                    signal = "sell"
+            signal = "buy" if s_fast and s_slow and s_fast > s_slow else ("sell" if s_fast and s_slow and s_fast < s_slow else "none")
 
-            # Trading logic (long-only for simplicity)
             if signal == "buy" and state["position"] != "long":
                 units = ORDER_USD / last
-                state["position"] = "long"
-                state["entry_price"] = last
-                state["units"] = units
-                state["last_signal"] = "buy"
+                state.update({"position": "long", "entry_price": last, "units": units, "last_signal": "buy"})
                 trades.append({"t": now_iso(), "type": "buy", "price": last, "units": units})
                 print(f"[bot] BUY {units:.6f} @ {last}", flush=True)
 
@@ -78,15 +73,11 @@ def main():
                 state["pnl_usd"] = float(state["pnl_usd"]) + pnl
                 trades.append({"t": now_iso(), "type": "sell", "price": last, "units": state["units"], "pnl": pnl})
                 print(f"[bot] SELL {state['units']:.6f} @ {last}  pnl={pnl:.2f}  total={state['pnl_usd']:.2f}", flush=True)
-                state["position"] = "flat"
-                state["entry_price"] = None
-                state["units"] = 0.0
-                state["last_signal"] = "sell"
+                state.update({"position": "flat", "entry_price": None, "units": 0.0, "last_signal": "sell"})
 
-            # keep state updated
             state["updated_at"] = now_iso()
             save_json(STATE_PATH, state)
-            save_json(TRADES_PATH, trades[-500:])  # keep last 500
+            save_json(TRADES_PATH, trades[-500:])
 
         except Exception as e:
             print(f"[bot] error: {e}", flush=True)
