@@ -7,14 +7,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: { fetch-depth: 0 }
 
-      # Pack EXACTLY what's in the commit (no .git, no changing files)
       - name: Package repo (git archive)
         run: git archive --format=tar.gz -o package.tgz HEAD
 
-      - name: Upload to server
+      - name: Upload package
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.TB_HOST }}
@@ -29,12 +27,20 @@ jobs:
           host: ${{ secrets.TB_HOST }}
           username: ${{ secrets.TB_USER }}
           password: ${{ secrets.TB_PASS }}
-        # unpack -> sync into live dir -> rebuild
           script: |
             set -e
-            mkdir -p /srv/trading-bots-repo /srv/trading-bots
+            mkdir -p /srv/trading-bots /srv/trading-bots-repo
             cd /srv/trading-bots-repo
-            tar -xzf package.tgz
-            rm -f package.tgz
+            tar -xzf package.tgz && rm -f package.tgz
+
+            # write .env with GH secrets (not stored in repo)
+            cat >/srv/trading-bots/.env <<EOF
+BINANCE_API_KEY=${{ secrets.BINANCE_API_KEY }}
+BINANCE_API_SECRET=${{ secrets.BINANCE_API_SECRET }}
+EOF
+
+            # sync to live dir (keep data/logs)
             rsync -a --delete --exclude data --exclude logs /srv/trading-bots-repo/ /srv/trading-bots/
+
+            # rebuild & restart
             docker compose -f /srv/trading-bots/compose/docker-compose.yml up -d --build
