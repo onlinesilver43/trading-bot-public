@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -e
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+echo "### TRADING BOTS — WARMUP CONTEXT ###"
+echo "Repo: $(git -C "$REPO_DIR" remote get-url origin 2>/dev/null) @ $(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null)"
+echo "Params (compose):"
+grep -E 'EXCHANGE:|SYMBOL:|TIMEFRAME:|ORDER_SIZE_USD' "$REPO_DIR/compose/docker-compose.yml" | sed 's/^[[:space:]]*//'
+echo
+sshpass -f ~/.ssh/tb_pw ssh tb '
+set -e
+OS="$( (lsb_release -ds 2>/dev/null) || (. /etc/os-release; echo $PRETTY_NAME) )"
+IP="$(hostname -I | awk "{print \$1}")"
+echo "Server: " $(hostname) " | " "$OS" " | kernel " $(uname -r)
+echo "Docker: " $(docker --version | cut -d, -f1) " | Compose " "$(docker compose version | head -1)"
+echo "UI:     http://'$IP':8080"
+echo "Containers:"
+docker ps --format " - {{.Names}} => {{.Image}} ({{.Status}})"
+echo "State tail:"
+tail -n 5 /srv/trading-bots/data/paper_state.json 2>/dev/null || echo " (no state yet)"
+'
+echo "### END WARMUP ###"
