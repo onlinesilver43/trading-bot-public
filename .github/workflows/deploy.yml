@@ -34,13 +34,15 @@ jobs:
             cd /srv/trading-bots-repo
             tar -xzf package.tgz && rm -f package.tgz
 
-            # write .env from GitHub Secrets (no heredoc; avoids YAML issues)
+            # sync repo -> live (keep data/logs and .env)
+            rsync -a --delete \
+              --exclude data --exclude logs --exclude .env \
+              /srv/trading-bots-repo/ /srv/trading-bots/
+
+            # write .env AFTER rsync so --delete won't remove it
             : > /srv/trading-bots/.env
             printf "BINANCE_API_KEY=%s\n" "${{ secrets.BINANCE_API_KEY }}"   >> /srv/trading-bots/.env
             printf "BINANCE_API_SECRET=%s\n" "${{ secrets.BINANCE_API_SECRET }}" >> /srv/trading-bots/.env
-
-            # sync to live dir (keep data/logs)
-            rsync -a --delete --exclude data --exclude logs /srv/trading-bots-repo/ /srv/trading-bots/
 
             # rebuild & restart
             docker compose -f /srv/trading-bots/compose/docker-compose.yml up -d --build
