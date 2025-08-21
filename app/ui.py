@@ -83,3 +83,8 @@ def exports_page():
     </body></html>
     """
     return HTMLResponse(html)
+# --- Runner to keep container alive ---
+if __name__ == "__main__":
+    # Start FastAPI app with Uvicorn inside the container
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8080)
