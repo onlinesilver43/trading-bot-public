@@ -1,3 +1,4 @@
+last_snapshot_ts = 0
 import os, time, json, uuid
 from datetime import datetime, timezone
 import ccxt
@@ -132,7 +133,8 @@ def main():
 
     while True:
         try:
-            candles = ex.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=200)  # [ts, o,h,l,c,v]
+            candles = ex.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=200)
+        candles_closed, last_closed_ts = _drop_forming(candles)  # [ts, o,h,l,c,v]
             if not candles or len(candles) < max(FAST, SLOW) + CONFIRM_BARS:
                 time.sleep(LOOP_SEC); continue
 
@@ -300,7 +302,10 @@ def main():
                 "last_signal": state["last_signal"]
             })
             if len(snapshots) > 5000: snapshots = snapshots[-5000:]
-            save_json(F_SNAP, snapshots, pretty=False)
+            # append once per closed bar
+            if last_closed_ts != last_snapshot_ts:
+                last_snapshot_ts = last_closed_ts
+                save_json(F_SNAP, snapshots, pretty=False)
 
             # Save originals
             state["updated_at"] = now_iso()
@@ -314,3 +319,13 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def _drop_forming(candles):
+    """
+    Given CCXT ohlcv list [[ms,o,h,l,c,v],...], return (closed, last_closed_ts).
+    Drops the last potentially-forming bar.
+    """
+    if not candles or len(candles) < 2:
+        return (candles or []), (candles[-1][0] if candles else 0)
+    closed = candles[:-1]
+    return closed, closed[-1][0]
