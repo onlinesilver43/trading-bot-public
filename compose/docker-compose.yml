@@ -2,7 +2,6 @@ services:
   bot:
     build: ../app
     image: tb-app:latest
-    container_name: tb-bot
     command: ["python","/app/bot.py"]   # stays as-is unless you switched to bot_main.py
     env_file:
       - ../.env
@@ -30,7 +29,6 @@ services:
   ui:
     build: ../app
     image: tb-app:latest
-    container_name: tb-ui
     command: ["bash","-lc","uvicorn ui:app --host 0.0.0.0 --port 8080"]
     environment:
       DATA_DIR: "/data"
