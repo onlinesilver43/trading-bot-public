@@ -2,23 +2,18 @@ import os, json, io, zipfile
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
-# Data mount (read-only)
+# --- Paths (containers get these via compose env) ---
 DATA_DIR   = os.getenv("DATA_DIR", "/data")
 STATE_PATH = os.getenv("STATE_PATH", os.path.join(DATA_DIR, "paper_state.json"))
 TRADES_PATH= os.getenv("TRADES_PATH", os.path.join(DATA_DIR, "paper_trades.json"))
-
-# Host mounts (read-only) for source export
-HOST_APP      = os.getenv("HOST_APP", "/host_app")             # /srv/trading-bots/app
-HOST_COMPOSE  = os.getenv("HOST_COMPOSE", "/host_compose")     # /srv/trading-bots/compose
-HOST_GITHUB   = os.getenv("HOST_GITHUB", "/host_github")       # /srv/trading-bots/.github
+HOST_APP      = os.getenv("HOST_APP", "/host_app")            # /srv/trading-bots/app (ro)
+HOST_COMPOSE  = os.getenv("HOST_COMPOSE", "/host_compose")    # /srv/trading-bots/compose (ro)
+HOST_GITHUB   = os.getenv("HOST_GITHUB", "/host_github")      # /srv/trading-bots/.github (ro)
 
 DIAG_FILES = [
-    "paper_state.json",
-    "paper_trades.json",
-    "trades_detailed.json",
-    "candles_with_signals.json",
-    "state_snapshots.json",
-    "bot_config.json",
+    "paper_state.json", "paper_trades.json",
+    "trades_detailed.json", "candles_with_signals.json",
+    "state_snapshots.json", "bot_config.json",
 ]
 
 app = FastAPI()
@@ -28,25 +23,22 @@ def load(path, default):
         with open(path, "r", encoding="utf-8") as f: return json.load(f)
     except Exception: return default
 
-def zip_dirs(pairs, zip_name: str):
-    present_any = False
+def zip_dirs(pairs, zip_root: str):
+    has_any = False
     buf = io.BytesIO()
-    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as z:
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as z:
         for label, root in pairs:
             if not root or not os.path.isdir(root): continue
-            present_any = True
-            for dirpath, dirnames, filenames in os.walk(root):
-                # skip typical junk
-                dirnames[:] = [d for d in dirnames if d not in ("__pycache__", ".git")]
-                for fn in filenames:
+            has_any = True
+            for dp, dn, fnames in os.walk(root):
+                dn[:] = [d for d in dn if d not in ("__pycache__", ".git")]
+                for fn in fnames:
                     if fn.endswith((".pyc",".pyo",".DS_Store")): continue
-                    full = os.path.join(dirpath, fn)
-                    rel = os.path.relpath(full, root)
-                    z.write(full, arcname=os.path.join(zip_name, label, rel))
-    if not present_any:
-        return None
-    buf.seek(0)
-    return buf
+                    full = os.path.join(dp, fn)
+                    rel  = os.path.relpath(full, root)
+                    z.write(full, arcname=os.path.join(zip_root, label, rel))
+    if not has_any: return None
+    buf.seek(0); return buf
 
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -55,23 +47,26 @@ def home():
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Trading Bots – Status</title>
 <style>
-:root{--bg:#0b1020;--card:#141a2d;--text:#e8ecff;--muted:#9aa4c7;--accent:#6ea8fe;--green:#41d1a7;--red:#ff6b6b}
+:root{--bg:#0b1020;--card:#141a2d;--text:#e8ecff;--muted:#9aa4c7;--accent:#6ea8fe;--warn:#ffb74d;--green:#41d1a7;--red:#ff6b6b}
 *{box-sizing:border-box}body{margin:0;padding:24px;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial}
 h1{margin:0 0 16px;font-size:28px}.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
 .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
 .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}.value{font-weight:700;font-size:20px}
-.row{display:flex;justify-content:space-between;gap:12px;margin:8px 0}.btn{display:inline-block;padding:10px 14px;border-radius:10px;background:var(--accent);color:#081227;text-decoration:none;font-weight:700}
+.row{display:flex;justify-content:space-between;gap:12px;margin:8px 0}
+.btn{display:inline-block;padding:10px 14px;border-radius:10px;background:var(--accent);color:#081227;text-decoration:none;font-weight:700}
+.btn-warn{background:var(--warn);color:#081227}
 table{width:100%;border-collapse:collapse}th,td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:left}
 th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
-.pnl-pos{color:var(--green)}.pnl-neg{color:var(--red)}a{color:var(--accent)}.muted{color:var(--muted)}.pill{display:inline-block;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.08);font-size:12px}
+.pnl-pos{color:var(--green)}.pnl-neg{color:var(--red)}a{color:var(--accent)}.muted{color:var(--muted)}
 </style>
 </head><body>
 <h1>Trading Bots – Status <span class="muted" id="updated"></span></h1>
 
-<div style="margin:0 0 16px;">
+<div style="margin:0 0 16px; display:flex; gap:10px; flex-wrap:wrap;">
   <a class="btn" href="/api/export.zip">Export Diagnostics (ZIP)</a>
-  &nbsp; <a class="btn" href="/api/source.zip">Export Source (ZIP)</a>
-  &nbsp; <a href="/exports">Exports</a>
+  <a class="btn" href="/api/source.zip">Export Source (ZIP)</a>
+  <a class="btn" href="/exports">Exports</a>
+  <button id="btnReset" class="btn btn-warn" title="Clears paper JSON files on the server.">Hard Reset (paper)</button>
 </div>
 
 <div id="cards"></div>
@@ -89,13 +84,13 @@ th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;le
 const $=(id)=>document.getElementById(id);
 function usd(x){return x==null?"—":"$"+Number(x).toLocaleString(undefined,{maximumFractionDigits:2})}
 function num(x,n=6){return x==null?"—":Number(x).toFixed(n).replace(/\.?0+$/,'')}
-function set(id,t){const e=$(id); if(e) e.textContent=t;}
 
-function render(state){
-  const s=state.state||{}; const t=state.trades||[];
+async function load(){
+  const r=await fetch('/api/state'); const data=await r.json();
+  const s=data.state||{}, t=data.trades||[];
   $('updated').textContent='• '+(s.updated_at||'—');
   const pnlClass=(v)=>((v||0)>=0?'pnl-pos':'pnl-neg');
-  const html = `
+  const html=`
   <div class="grid">
     <div class="card">
       <div class="row"><div class="label">Symbol</div><div class="value">${s.symbol||'—'}</div></div>
@@ -103,20 +98,17 @@ function render(state){
       <div class="row"><div class="label">Last price</div><div class="value">${num(s.last_price,2)}</div></div>
       <div class="row"><div class="label">Action/Skip</div><div class="value">${(s.last_action||'—') + (s.skip_reason?` / ${s.skip_reason}`:'')}</div></div>
     </div>
-
     <div class="card">
       <div class="label">Starting</div>
       <div class="row"><div>Cash (USD)</div><div class="value">${usd(s.start_cash_usd)}</div></div>
       <div class="row"><div>Coin (units)</div><div class="value">${num(s.start_coin_units,6)}</div></div>
     </div>
-
     <div class="card">
       <div class="label">Current</div>
       <div class="row"><div>Cash (USD)</div><div class="value">${usd(s.cash_usd)}</div></div>
       <div class="row"><div>Coin (units)</div><div class="value">${num(s.coin_units,6)}</div></div>
       <div class="row"><div>Equity (USD)</div><div class="value">${usd(s.equity_usd)}</div></div>
     </div>
-
     <div class="card">
       <div class="label">PnL</div>
       <div class="row"><div>Realized PnL</div><div class="value ${pnlClass(s.pnl_usd)}">${usd(s.pnl_usd)}</div></div>
@@ -124,24 +116,26 @@ function render(state){
       <div class="row"><div>Fees paid</div><div class="value">${usd(s.fees_paid_usd)}</div></div>
     </div>
   </div>`;
-  document.getElementById('cards').innerHTML = html;
+  document.getElementById('cards').innerHTML=html;
 
   $('tradeCount').textContent=`${t.length} total`;
   const body=document.querySelector('#trades tbody');
   body.innerHTML=t.slice(-10).reverse().map(x=>`
     <tr>
-      <td>${x.t||''}</td>
-      <td>${x.type||''}</td>
-      <td>${num(x.price,2)}</td>
-      <td>${num(x.units,6)}</td>
-      <td>${usd(x.fee_usd)}</td>
-      <td>${x.type==='sell'?usd(x.pnl):''}</td>
-      <td>${usd(x.cash_usd)}</td>
-      <td>${num(x.coin_units,6)}</td>
+      <td>${x.t||''}</td><td>${x.type||''}</td><td>${num(x.price,2)}</td><td>${num(x.units,6)}</td>
+      <td>${usd(x.fee_usd)}</td><td>${x.type==='sell'?usd(x.pnl):''}</td>
+      <td>${usd(x.cash_usd)}</td><td>${num(x.coin_units,6)}</td>
     </tr>`).join('');
 }
-async function load(){ const r=await fetch('/api/state'); render(await r.json()); }
-load(); setInterval(load, 2000);
+load(); setInterval(load,2000);
+
+document.getElementById('btnReset').addEventListener('click', async ()=>{
+  if(!confirm('Hard reset paper data? This clears all JSON state/trades/exports.')) return;
+  const r = await fetch('/api/reset', {method:'POST'});
+  const j = await r.json().catch(()=>({}));
+  alert(r.ok ? ('Reset done: '+(j.removed||[]).join(', ') || 'nothing to delete') : ('Reset failed: '+(j.detail||r.status)));
+  setTimeout(()=>location.reload(), 1000);
+});
 </script></body></html>
     """
     return HTMLResponse(html)
@@ -151,8 +145,7 @@ def exports_page():
     rows=[]
     for fn in DIAG_FILES:
         p=os.path.join(DATA_DIR, fn)
-        exists=os.path.isfile(p)
-        size=os.path.getsize(p) if exists else 0
+        exists=os.path.isfile(p); size=os.path.getsize(p) if exists else 0
         rows.append((fn, exists, size))
     rows_html="".join([f"<tr><td><a href=\"/exports/view/{fn}\">{fn}</a></td><td>{'yes' if e else 'no'}</td><td>{s}</td></tr>" for fn,e,s in rows])
     html=f"""<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -170,8 +163,7 @@ def view_json(name: str):
     p=os.path.join(DATA_DIR, name)
     if not os.path.isfile(p): raise HTTPException(404, f"{name} not found")
     try:
-        with open(p,"r",encoding="utf-8") as f: data=json.load(f)
-        body=json.dumps(data, indent=2)
+        with open(p,"r",encoding="utf-8") as f: data=json.load(f); body=json.dumps(data, indent=2)
     except Exception:
         with open(p,"r",encoding="utf-8") as f: body=f.read()
     return HTMLResponse(f"<pre style='white-space:pre-wrap'>{body}</pre>")
@@ -188,25 +180,34 @@ def api_export_zip():
     for fn in DIAG_FILES:
         p=os.path.join(DATA_DIR, fn)
         if os.path.isfile(p): present.append((fn,p))
-    if not present:
-        raise HTTPException(status_code=404, detail="No diagnostics files exist yet.")
+    if not present: raise HTTPException(status_code=404, detail="No diagnostics files exist yet.")
     buf=io.BytesIO()
-    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as z:
-        for fn,p in present:
-            z.write(p, arcname=fn)
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        for fn,p in present: z.write(p, arcname=fn)
     buf.seek(0)
-    headers={"Content-Disposition": 'attachment; filename="trading-bot-export.zip"'}
-    return StreamingResponse(buf, media_type="application/zip", headers=headers)
+    return StreamingResponse(buf, media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="trading-bot-export.zip"'})
 
 @app.get("/api/source.zip")
 def api_source_zip():
     pairs = [
         ("app",      HOST_APP if os.path.isdir(HOST_APP) else None),
         ("compose",  HOST_COMPOSE if os.path.isdir(HOST_COMPOSE) else None),
-        (".github",  os.path.join(HOST_GITHUB, "workflows") if os.path.isdir(os.path.join(HOST_GITHUB, "workflows")) else None),
+        (".github",  os.path.join(HOST_GITHUB, "workflows") if os.path.isdir(os.path.join(HOST_GITHUB,"workflows")) else None),
     ]
     buf = zip_dirs(pairs, "trading-bot-source")
-    if buf is None:
-        raise HTTPException(status_code=404, detail="No source directories are mounted in UI container.")
-    headers={"Content-Disposition": 'attachment; filename="trading-bot-source.zip"'}
-    return StreamingResponse(buf, media_type="application/zip", headers=headers)
+    if buf is None: raise HTTPException(404, "No source directories are mounted in UI container.")
+    return StreamingResponse(buf, media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="trading-bot-source.zip"'})
+
+@app.post("/api/reset")
+def api_reset():
+    removed=[]
+    for fn in DIAG_FILES:
+        p=os.path.join(DATA_DIR, fn)
+        if os.path.isfile(p):
+            try:
+                os.remove(p); removed.append(fn)
+            except Exception as e:
+                raise HTTPException(500, f"Failed to remove {fn}: {e}")
+    return JSONResponse({"status":"ok","removed":removed})
