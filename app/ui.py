@@ -1,11 +1,12 @@
-import os, json, io, zipfile
+import os, json, io, zipfile, time
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 # --- Paths (containers get these via compose env) ---
-DATA_DIR   = os.getenv("DATA_DIR", "/data")
-STATE_PATH = os.getenv("STATE_PATH", os.path.join(DATA_DIR, "paper_state.json"))
-TRADES_PATH= os.getenv("TRADES_PATH", os.path.join(DATA_DIR, "paper_trades.json"))
+DATA_DIR      = os.getenv("DATA_DIR", "/data")
+STATE_PATH    = os.getenv("STATE_PATH", os.path.join(DATA_DIR, "paper_state.json"))
+TRADES_PATH   = os.getenv("TRADES_PATH", os.path.join(DATA_DIR, "paper_trades.json"))
+CONFIG_PATH   = os.path.join(DATA_DIR, "bot_config.json")
 HOST_APP      = os.getenv("HOST_APP", "/host_app")            # /srv/trading-bots/app (ro)
 HOST_COMPOSE  = os.getenv("HOST_COMPOSE", "/host_compose")    # /srv/trading-bots/compose (ro)
 HOST_GITHUB   = os.getenv("HOST_GITHUB", "/host_github")      # /srv/trading-bots/.github (ro)
@@ -18,10 +19,11 @@ DIAG_FILES = [
 
 app = FastAPI()
 
-def load(path, default):
+def load_json(path, default):
     try:
         with open(path, "r", encoding="utf-8") as f: return json.load(f)
-    except Exception: return default
+    except Exception:
+        return default
 
 def zip_dirs(pairs, zip_root: str):
     has_any = False
@@ -58,6 +60,9 @@ h1{margin:0 0 16px;font-size:28px}.grid{display:grid;gap:16px;grid-template-colu
 table{width:100%;border-collapse:collapse}th,td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:left}
 th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
 .pnl-pos{color:var(--green)}.pnl-neg{color:var(--red)}a{color:var(--accent)}.muted{color:var(--muted)}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}
+.badge-ok{background:#153d2a;color:#41d1a7}.badge-warn{background:#3e2f14;color:#ffb74d}.badge-err{background:#3d1a1a;color:#ff6b6b}
+.small{font-size:12px}
 </style>
 </head><body>
 <h1>Trading Bots – Status <span class="muted" id="updated"></span></h1>
@@ -84,41 +89,91 @@ th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;le
 const $=(id)=>document.getElementById(id);
 function usd(x){return x==null?"—":"$"+Number(x).toLocaleString(undefined,{maximumFractionDigits:2})}
 function num(x,n=6){return x==null?"—":Number(x).toFixed(n).replace(/\.?0+$/,'')}
+function pct(x,n=2){return x==null?"—":(Number(x)*100).toFixed(n).replace(/\.?0+$/,'')+'%'}
+
+function heartbeat(tsStr){
+  // Returns [labelClass, text] where class is badge-ok/warn/err based on seconds since update
+  if(!tsStr) return ["badge-err","stale"];
+  const now = Date.now();
+  const last = Date.parse(tsStr);
+  if(isNaN(last)) return ["badge-err","invalid time"];
+  const diff = (now - last)/1000;
+  if(diff <= 15) return ["badge-ok", "live"];
+  if(diff <= 90) return ["badge-warn", Math.round(diff)+"s behind"];
+  return ["badge-err", Math.round(diff/60)+"m behind"];
+}
 
 async function load(){
-  const r=await fetch('/api/state'); const data=await r.json();
-  const s=data.state||{}, t=data.trades||[];
+  const [stateRes, cfgRes] = await Promise.all([
+    fetch('/api/state'), fetch('/exports/view/bot_config.json').catch(()=>null)
+  ]);
+  const data = await stateRes.json();
+  const s = data.state||{}, t = data.trades||[];
+  let cfg = null;
+  if(cfgRes && cfgRes.ok){
+    const txt = await cfgRes.text();
+    try{ cfg = JSON.parse(txt.replace(/^<pre[^>]*>/,'').replace(/<\/pre>$/,'')); }catch(e){ cfg=null; }
+  }
+
   $('updated').textContent='• '+(s.updated_at||'—');
-  const pnlClass=(v)=>((v||0)>=0?'pnl-pos':'pnl-neg');
-  const html=`
+  $('tradeCount').textContent=`${t.length} total`;
+
+  const [hbClass, hbText] = heartbeat(s.updated_at);
+
+  // Derive some simple metrics
+  const symbol = s.symbol || (cfg && cfg.symbol) || '—';
+  const timeframe = (cfg && cfg.timeframe) || '—';
+  const position = s.position || '—';
+  const entry = s.entry_price!=null ? ` @ ${num(s.entry_price,2)}` : '';
+  const unreal = s.unrealized_pnl_usd;
+  const equity = s.equity_usd;
+
+  // Config snapshot (show only if cfg present)
+  const cfgRows = cfg ? `
+    <div class="row"><div class="label">Pair / TF</div><div class="value">${cfg.symbol||'—'} / ${cfg.timeframe||'—'}</div></div>
+    <div class="row"><div>FAST / SLOW</div><div class="value">${cfg.fast_sma_len} / ${cfg.slow_sma_len}</div></div>
+    <div class="row"><div>Confirm bars</div><div class="value">${cfg.confirm_bars}</div></div>
+    <div class="row"><div>Min hold bars</div><div class="value">${cfg.min_hold_bars}</div></div>
+    <div class="row"><div>Threshold</div><div class="value">${pct(cfg.hysteresis_bp?cfg.hysteresis_bp/10000:cfg.threshold_pct)}</div></div>
+    <div class="row"><div>Order sizing</div><div class="value">${cfg.order_pct_equity!=null? (pct(cfg.order_pct_equity)+' of equity'):('$'+(cfg.order_size_usd||'—'))}</div></div>
+  ` : `<div class="small muted">No bot_config.json yet.</div>`;
+
+  // Bot summary card (future-proof for multi-bot; today it's the single bot)
+  const cardsHTML = `
   <div class="grid">
     <div class="card">
-      <div class="row"><div class="label">Symbol</div><div class="value">${s.symbol||'—'}</div></div>
-      <div class="row"><div class="label">Position</div><div class="value">${(s.position||'—') + (s.entry_price?` @ ${num(s.entry_price,2)}`:'')}</div></div>
-      <div class="row"><div class="label">Last price</div><div class="value">${num(s.last_price,2)}</div></div>
-      <div class="row"><div class="label">Action/Skip</div><div class="value">${(s.last_action||'—') + (s.skip_reason?` / ${s.skip_reason}`:'')}</div></div>
+      <div class="row"><div class="label">Bot Summary</div><div class="badge ${hbClass}">${hbText}</div></div>
+      <div class="row"><div>Symbol</div><div class="value">${symbol}</div></div>
+      <div class="row"><div>Timeframe</div><div class="value">${timeframe}</div></div>
+      <div class="row"><div>Position</div><div class="value">${position}${entry}</div></div>
+      <div class="row"><div>Last price</div><div class="value">${num(s.last_price,2)}</div></div>
+      <div class="row"><div>Equity (USD)</div><div class="value">${usd(equity)}</div></div>
+      <div class="row"><div>Unrealized PnL</div><div class="value ${(unreal||0)>=0?'pnl-pos':'pnl-neg'}">${usd(unreal)}</div></div>
+      <div class="row"><div>Action/Skip</div><div class="value small">${(s.last_action||'—') + (s.skip_reason?` / ${s.skip_reason}`:'')}</div></div>
     </div>
+
+    <div class="card">
+      <div class="row"><div class="label">Config Snapshot</div><div class="muted small">${cfg && cfg.updated_at ? cfg.updated_at : ''}</div></div>
+      ${cfgRows}
+    </div>
+
     <div class="card">
       <div class="label">Starting</div>
       <div class="row"><div>Cash (USD)</div><div class="value">${usd(s.start_cash_usd)}</div></div>
       <div class="row"><div>Coin (units)</div><div class="value">${num(s.start_coin_units,6)}</div></div>
     </div>
+
     <div class="card">
       <div class="label">Current</div>
       <div class="row"><div>Cash (USD)</div><div class="value">${usd(s.cash_usd)}</div></div>
       <div class="row"><div>Coin (units)</div><div class="value">${num(s.coin_units,6)}</div></div>
       <div class="row"><div>Equity (USD)</div><div class="value">${usd(s.equity_usd)}</div></div>
-    </div>
-    <div class="card">
-      <div class="label">PnL</div>
-      <div class="row"><div>Realized PnL</div><div class="value ${pnlClass(s.pnl_usd)}">${usd(s.pnl_usd)}</div></div>
-      <div class="row"><div>Unrealized PnL</div><div class="value ${pnlClass(s.unrealized_pnl_usd)}">${usd(s.unrealized_pnl_usd)}</div></div>
       <div class="row"><div>Fees paid</div><div class="value">${usd(s.fees_paid_usd)}</div></div>
     </div>
   </div>`;
-  document.getElementById('cards').innerHTML=html;
 
-  $('tradeCount').textContent=`${t.length} total`;
+  $('cards').innerHTML = cardsHTML;
+
   const body=document.querySelector('#trades tbody');
   body.innerHTML=t.slice(-10).reverse().map(x=>`
     <tr>
@@ -170,8 +225,8 @@ def view_json(name: str):
 
 @app.get("/api/state", response_class=JSONResponse)
 def api_state():
-    s = load(STATE_PATH, {})
-    t = load(TRADES_PATH, [])
+    s = load_json(STATE_PATH, {})
+    t = load_json(TRADES_PATH, [])
     return JSONResponse({"state": s, "trades": t[-200:]})
 
 @app.get("/api/export.zip")
