@@ -40,7 +40,7 @@ services:
       HOST_COMPOSE: "/host_compose"
       HOST_GITHUB: "/host_github"
     volumes:
-      - /srv/trading-bots/data:/data:ro
+      - /srv/trading-bots/data:/data
       - /srv/trading-bots/app:/host_app:ro
       - /srv/trading-bots/compose:/host_compose:ro
       - /srv/trading-bots/.github:/host_github:ro
