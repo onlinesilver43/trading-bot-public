@@ -46,4 +46,5 @@ jobs:
             printf "BINANCE_API_SECRET=%s\n" "${{ secrets.BINANCE_API_SECRET }}" >> /srv/trading-bots/.env
 
             # rebuild & restart
-            docker compose -f /srv/trading-bots/compose/docker-compose.yml up -d --build
+            docker compose -p tb -f /srv/trading-bots/compose/docker-compose.yml down --remove-orphans 
+            docker compose -p tb -f /srv/trading-bots/compose/docker-compose.yml up -d --build --remove-orphans
