@@ -1,25 +1,25 @@
-# app/ui.py
-# FastAPI UI with invariant endpoints and small quality-of-life additions.
-import os, io, json, zipfile, shutil, glob
+# app/ui.py — FastAPI UI with invariant endpoints + index dashboard (auto-refresh)
+import os, io, json, zipfile
 from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 
 DATA_DIR = os.environ.get("DATA_DIR", "/srv/trading-bots/data")
-APP_DIR = os.environ.get("APP_DIR", "/srv/trading-bots/app")
+APP_DIR  = os.environ.get("APP_DIR",  "/srv/trading-bots/app")
 
 app = FastAPI(title="tb-ui")
 
-def jload(p, d): 
+def jload(p, d):
     try:
-        with open(p, "r", encoding="utf-8") as f: 
+        with open(p, "r", encoding="utf-8") as f:
             return json.load(f)
-    except: 
+    except:
         return d
 
+# -------- Invariant APIs --------
 @app.get("/api/state")
 def api_state():
-    state = jload(f"{DATA_DIR}/paper_state.json", {})
+    state  = jload(f"{DATA_DIR}/paper_state.json", {})
     trades = jload(f"{DATA_DIR}/paper_trades.json", [])
     return JSONResponse({"state": state, "trades": trades})
 
@@ -34,14 +34,15 @@ def api_export_zip():
             p = f"{DATA_DIR}/{name}"
             if os.path.exists(p):
                 z.write(p, arcname=name)
-        readme = (
+        z.writestr(
+            "README.txt",
             "# Trading Bot Export\n"
             f"Generated: {datetime.now(timezone.utc).isoformat()}\n"
             "Contains: state, trades, detailed, candles_with_signals, snapshots, bot_config\n"
         )
-        z.writestr("README.txt", readme)
     mem.seek(0)
-    return StreamingResponse(mem, media_type="application/zip", headers={"Content-Disposition":"attachment; filename=export.zip"})
+    return StreamingResponse(mem, media_type="application/zip",
+                             headers={"Content-Disposition":"attachment; filename=export.zip"})
 
 @app.get("/api/source.zip")
 def api_source_zip():
@@ -53,7 +54,8 @@ def api_source_zip():
                 arc = os.path.relpath(p, APP_DIR)
                 z.write(p, arcname=arc)
     mem.seek(0)
-    return StreamingResponse(mem, media_type="application/zip", headers={"Content-Disposition":"attachment; filename=source.zip"})
+    return StreamingResponse(mem, media_type="application/zip",
+                             headers={"Content-Disposition":"attachment; filename=source.zip"})
 
 @app.post("/api/reset")
 def api_reset():
@@ -70,6 +72,7 @@ def api_reset():
         json.dump(seed, f)
     return JSONResponse({"ok": True, "removed": removed})
 
+# -------- Convenience page (unchanged path) --------
 @app.get("/exports")
 def exports_page():
     html = """
@@ -83,8 +86,70 @@ def exports_page():
     </body></html>
     """
     return HTMLResponse(html)
-# --- Runner to keep container alive ---
+
+# -------- NEW: Root index dashboard (auto-refresh ~2s) --------
+@app.get("/")
+def index():
+    html = """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>TB — Status</title>
+  <meta http-equiv="refresh" content="2">
+  <style>
+    body{font-family:system-ui;margin:24px;max-width:900px}
+    .row{display:flex;gap:24px;flex-wrap:wrap}
+    .card{border:1px solid #ddd;border-radius:12px;padding:16px;flex:1 1 280px}
+    .muted{color:#666;font-size:12px}
+    code{background:#f6f8fa;padding:2px 4px;border-radius:6px}
+    a{color:#0b67ff;text-decoration:none}
+  </style>
+</head>
+<body>
+  <h2>Trading Bot — Live Status</h2>
+  <div class="row">
+    <div class="card">
+      <h3>State</h3>
+      <div id="state">Loading…</div>
+      <div class="muted">Auto-refreshes every ~2s</div>
+    </div>
+    <div class="card">
+      <h3>Quick Links</h3>
+      <ul>
+        <li><a href="/api/state" target="_blank">/api/state</a></li>
+        <li><a href="/exports" target="_blank">/exports</a></li>
+        <li><a href="/api/export.zip" target="_blank">export.zip</a></li>
+        <li><a href="/api/source.zip" target="_blank">source.zip</a></li>
+      </ul>
+    </div>
+  </div>
+  <script>
+    fetch('/api/state').then(r => r.json()).then(d => {
+      const s = d.state || {};
+      const rows = [
+        ['last_action', s.last_action],
+        ['last_skip_reason', s.last_skip_reason],
+        ['last_closed_bar_iso', s.last_closed_bar_iso],
+        ['heartbeat_iso', s.heartbeat_iso],
+        ['bars_since_trade', s.bars_since_trade],
+        ['equity_usd', s.equity_usd],
+        ['cash_usd', s.cash_usd],
+        ['pos_qty', s.pos_qty],
+        ['pos_avg', s.pos_avg],
+      ].map(([k,v]) => `<tr><td><code>${k}</code></td><td>${v===undefined?'':v}</td></tr>`).join('');
+      document.getElementById('state').innerHTML =
+        `<table>${rows}</table>`;
+    }).catch(e=>{
+      document.getElementById('state').textContent = 'Error loading /api/state';
+    });
+  </script>
+</body>
+</html>
+"""
+    return HTMLResponse(html)
+
+# -------- Runner (keeps container alive) --------
 if __name__ == "__main__":
-    # Start FastAPI app with Uvicorn inside the container
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
