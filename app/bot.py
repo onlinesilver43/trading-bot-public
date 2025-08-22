@@ -1,8 +1,8 @@
 import os, json, time, traceback
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import ccxt
 
-# ---- Paths (unchanged) ----
+# ---- Paths (do not change) ----
 DATA_DIR   = os.getenv("DATA_DIR", "/data")
 STATE_PATH = os.getenv("STATE_PATH", os.path.join(DATA_DIR, "paper_state.json"))
 TRADES_PATH= os.getenv("TRADES_PATH", os.path.join(DATA_DIR, "paper_trades.json"))
@@ -15,25 +15,42 @@ F_SNAP = os.path.join(DATA_DIR, "state_snapshots.json")
 EXCHANGE = os.getenv("EXCHANGE", "binanceus")
 SYMBOL   = os.getenv("SYMBOL", "BTC/USDT")
 TIMEFRAME= os.getenv("TIMEFRAME", "1m")
+
 FAST     = int(os.getenv("FAST", "7"))
 SLOW     = int(os.getenv("SLOW", "25"))
-CONFIRM_BARS   = int(os.getenv("CONFIRM_BARS", "2"))
-MIN_HOLD_BARS  = int(os.getenv("MIN_HOLD_BARS", "3"))
-THRESHOLD_PCT  = float(os.getenv("THRESHOLD_PCT", "0.003"))  # 0.30%
+CONFIRM_BARS   = int(os.getenv("CONFIRM_BARS", "1"))
+MIN_HOLD_BARS  = int(os.getenv("MIN_HOLD_BARS", "2"))
+THRESHOLD_PCT  = float(os.getenv("THRESHOLD_PCT", "0.0005"))  # 0.05% hysteresis
+
 FEE_RATE       = float(os.getenv("FEE_RATE", "0.001"))
+SLIPPAGE_BP    = float(os.getenv("SLIPPAGE_BP", "5"))
+COST_BUFFER_BP = float(os.getenv("COST_BUFFER_BP", "0"))
 
 START_CASH_USD   = float(os.getenv("START_CASH_USD", "200"))
-ORDER_SIZE_USD   = float(os.getenv("ORDER_SIZE_USD", "20"))
+ORDER_SIZE_USD   = float(os.getenv("ORDER_SIZE_USD", "0"))
 ORDER_PCT_EQUITY = os.getenv("ORDER_PCT_EQUITY")
 ORDER_PCT_EQUITY = None if ORDER_PCT_EQUITY in (None,"","null","None") else float(ORDER_PCT_EQUITY)
 MIN_TRADE_USD    = float(os.getenv("MIN_TRADE_USD", "5"))
+STACK_FLOOR_USD  = float(os.getenv("STACK_FLOOR_USD", "0"))
 
-# ---- Stacking knobs ----
-STACK_FLOOR_USD  = float(os.getenv("STACK_FLOOR_USD", "200"))   # never let cash drop below this
-SKIM_PROFIT_PCT  = float(os.getenv("SKIM_PROFIT_PCT", "0.15"))  # % of realized profit to stash
+# --- Blended stacking knobs ---
+RETAIN_PCT_UP   = float(os.getenv("RETAIN_PCT_UP", "0.10"))  # keep 10% each sell in uptrend
+RETAIN_PCT_CHOP = float(os.getenv("RETAIN_PCT_CHOP", "0.03"))# keep 3% in chop
+RETAIN_PCT_DOWN = float(os.getenv("RETAIN_PCT_DOWN", "0.00"))# keep 0% in downtrend
 
-LOOP_SEC = 5
+CASH_FLOOR_PCT  = float(os.getenv("CASH_FLOOR_PCT", "0.40")) # disable retention if cash < 40% equity
 
+TREND_SLOPE_BARS       = int(os.getenv("TREND_SLOPE_BARS", "20"))
+SLOPE_MIN_PCT_PER_BAR  = float(os.getenv("SLOPE_MIN_PCT_PER_BAR", "0.0001"))
+
+REBALANCE_DAYS              = int(os.getenv("REBALANCE_DAYS", "30"))
+REBALANCE_MAX_STASH_PCT     = float(os.getenv("REBALANCE_MAX_STASH_PCT", "0.70"))
+REBALANCE_TARGET_STASH_PCT  = float(os.getenv("REBALANCE_TARGET_STASH_PCT", "0.60"))
+
+# Legacy skim disabled (we use retention-by-regime)
+SKIM_PROFIT_PCT = float(os.getenv("SKIM_PROFIT_PCT", "0"))
+
+# ---- Helpers ----
 def tf_to_ms(tf: str) -> int:
     tf = (tf or '').strip().lower()
     if tf.endswith('ms'): return int(tf[:-2])
@@ -41,20 +58,15 @@ def tf_to_ms(tf: str) -> int:
     if tf.endswith('m'):  return int(tf[:-1]) * 60_000
     if tf.endswith('h'):  return int(tf[:-1]) * 3_600_000
     if tf.endswith('d'):  return int(tf[:-1]) * 86_400_000
-    # default 1m
-    return 60_000
+    return 60_000  # default 1m
+tf_ms = tf_to_ms(TIMEFRAME)
 
 def sleep_until_next_close(tf_ms: int, last_closed_ts_ms: int):
-    import time
-    # next close is last_closed_ts + tf_ms
     target = (last_closed_ts_ms or 0) + int(tf_ms)
     now_ms = int(time.time()*1000)
-    # small guard so we wake just after the close
     delay = max(0.0, (target - now_ms)/1000.0 + 0.5)
     time.sleep(delay)
 
-
-# ---- Utils ----
 def load_json(p, d):
     try:
         with open(p, "r", encoding="utf-8") as f: return json.load(f)
@@ -65,25 +77,25 @@ def atomic_write_json(p, obj):
     with open(tmp, "w", encoding="utf-8") as f: json.dump(obj, f)
     os.replace(tmp, p)
 
-def append_json_array(path, obj):
+def append_json_array(path, obj, cap=2000):
     arr = load_json(path, [])
     arr.append(obj)
-    atomic_write_json(path, arr[-2000:])  # bound size
+    atomic_write_json(path, arr[-cap:])
 
 def ensure_state_defaults(s):
     s.setdefault("start_cash_usd", START_CASH_USD)
     s.setdefault("cash_usd", s["start_cash_usd"])
-    s.setdefault("coin_units", 0.0)         # total = stash + trade
-    s.setdefault("trade_coin_units", 0.0)   # tradable
-    s.setdefault("stash_coin_units", 0.0)   # never sold
+    s.setdefault("trade_coin_units", 0.0)
+    s.setdefault("stash_coin_units", 0.0)
     s["coin_units"] = float(s["stash_coin_units"]) + float(s["trade_coin_units"])
     s.setdefault("fees_paid_usd", 0.0)
     s.setdefault("pnl_usd", 0.0)
     s.setdefault("unrealized_pnl_usd", 0.0)
-    s.setdefault("position", "flat")   # 'long' or 'flat'
+    s.setdefault("position", "flat")
     s.setdefault("entry_price", None)
     s.setdefault("last_action", "seed")
     s.setdefault("last_signal", None)
+    s.setdefault("last_rebalance_ts", None)  # ISO
     s.setdefault("symbol", SYMBOL)
     return s
 
@@ -109,21 +121,27 @@ def write_bot_config(symbol):
         "symbol": symbol, "timeframe": TIMEFRAME,
         "fast_sma_len": FAST, "slow_sma_len": SLOW,
         "confirm_bars": CONFIRM_BARS,
-        "hysteresis_bp": THRESHOLD_PCT*100.0,
+        "min_hold_bars": MIN_HOLD_BARS,
+        "hysteresis_bp": round(THRESHOLD_PCT*100.0, 4),
         "order_size_usd": ORDER_SIZE_USD,
         "order_pct_equity": ORDER_PCT_EQUITY,
-        "order_type": "market",
         "maker_fee_bp": FEE_RATE*10000, "taker_fee_bp": FEE_RATE*10000,
-        "assumed_slippage_bp": 0.0, "min_notional_usd": 1.0,
+        "assumed_slippage_bp": SLIPPAGE_BP, "min_notional_usd": 1.0,
         "tick_size": 0.01, "step_size": 1e-5,
         "stack_floor_usd": STACK_FLOOR_USD,
-        "skim_profit_pct": SKIM_PROFIT_PCT,
+        # expose stacking knobs
+        "retain_pct_up": RETAIN_PCT_UP,
+        "retain_pct_chop": RETAIN_PCT_CHOP,
+        "retain_pct_down": RETAIN_PCT_DOWN,
+        "cash_floor_pct": CASH_FLOOR_PCT,
+        "rebalance_days": REBALANCE_DAYS,
+        "rebalance_max_stash_pct": REBALANCE_MAX_STASH_PCT,
+        "rebalance_target_stash_pct": REBALANCE_TARGET_STASH_PCT,
         "updated_at": datetime.now(timezone.utc).isoformat(timespec='seconds'),
     }
     atomic_write_json(F_CFG, info)
 
 def ensure_expected_files_exist(state):
-    """Idempotently ensure config + trade files exist."""
     try:
         if not os.path.isfile(F_CFG):
             write_bot_config(state.get("symbol") or SYMBOL)
@@ -134,7 +152,6 @@ def ensure_expected_files_exist(state):
         print(f"[bot] ensure files error: {e}", flush=True)
 
 def reseed_if_missing(state, last_price=None):
-    """If state files were deleted (Hard Reset), re-seed fresh."""
     missing = [p for p in (STATE_PATH, TRADES_PATH, F_CFG) if not os.path.isfile(p)]
     if not missing:
         return state, False
@@ -164,9 +181,12 @@ def choose_symbol(ex, preferred):
 def available_cash_for_buy(state):
     return max(0.0, float(state["cash_usd"]) - STACK_FLOOR_USD)
 
+def equity_now(state, price):
+    return float(state.get("cash_usd", 0.0)) + (float(state.get("coin_units", 0.0)) * price)
+
 def size_usd(state, price):
-    equity = float(state["cash_usd"]) + float(state["coin_units"]) * price
-    want = (equity * ORDER_PCT_EQUITY) if ORDER_PCT_EQUITY is not None else ORDER_SIZE_USD
+    eq = equity_now(state, price)
+    want = (eq * ORDER_PCT_EQUITY) if ORDER_PCT_EQUITY is not None else ORDER_SIZE_USD
     return max(0.0, min(want, available_cash_for_buy(state)))
 
 def place_buy(state, price, ts_bar):
@@ -191,55 +211,158 @@ def place_buy(state, price, ts_bar):
     })
     return "ok", None
 
-def place_sell_with_skim(state, price, ts_bar):
-    trade_units = float(state["trade_coin_units"])
+def place_sell_with_stack_dynamic(state, price, ts_bar, regime):
+    """
+    Always retain coins by regime. Enforce cash floor; sell remainder.
+    regime: 'up' | 'chop' | 'down'
+    """
+    trade_units = float(state.get("trade_coin_units", 0.0))
     if trade_units <= 0: return "skip", "no tradable position"
 
-    gross = trade_units * price
+    # retention by regime
+    base_pct = {"up": RETAIN_PCT_UP, "chop": RETAIN_PCT_CHOP, "down": RETAIN_PCT_DOWN}.get(regime, RETAIN_PCT_CHOP)
+
+    # cash floor guard: if cash < floor% of equity, disable retention this sell
+    eq = equity_now(state, price)
+    cash = float(state.get("cash_usd", 0.0))
+    floor_cash = CASH_FLOOR_PCT * eq
+    effective_pct = base_pct if cash >= floor_cash else 0.0
+
+    retain_units = max(0.0, min(trade_units, trade_units * effective_pct))
+
+    # move retained to stash BEFORE selling the rest
+    if retain_units > 0:
+        state["trade_coin_units"] = float(trade_units - retain_units)
+        state["stash_coin_units"] = float(state.get("stash_coin_units", 0.0)) + retain_units
+        state["coin_units"] = state["stash_coin_units"] + state["trade_coin_units"]
+        append_json_array(TRADES_PATH, {
+            "t": iso(ts_bar), "type": "retain_to_stash", "price": price,
+            "units": retain_units, "fee_usd": 0.0,
+            "cash_usd": state.get("cash_usd"), "coin_units": state["coin_units"],
+            "note": f"regime={regime}, pct={effective_pct:.3f}"
+        })
+
+    sell_units = float(state["trade_coin_units"])
+    if sell_units <= 0:
+        state["position"] = "flat"; state["entry_price"] = None
+        return "ok", None
+
+    # sell remaining tradable units
+    gross = sell_units * price
     fee = gross * FEE_RATE
     cash_net = gross - fee
     entry = state.get("entry_price") or price
-    pnl = (price - entry) * trade_units
+    pnl = (price - entry) * sell_units
 
-    state["cash_usd"] += cash_net
-    state["fees_paid_usd"] += fee
-    state["pnl_usd"] = state.get("pnl_usd", 0.0) + pnl
+    state["cash_usd"] = float(state.get("cash_usd", 0.0)) + cash_net
+    state["fees_paid_usd"] = float(state.get("fees_paid_usd", 0.0)) + fee
+    state["pnl_usd"] = float(state.get("pnl_usd", 0.0)) + pnl
 
     append_json_array(TRADES_PATH, {
         "t": iso(ts_bar), "type": "sell", "price": price,
-        "units": -trade_units, "fee_usd": fee, "cash_usd": state["cash_usd"],
-        "coin_units": state["coin_units"], "pnl": pnl
+        "units": -sell_units, "fee_usd": fee, "cash_usd": state["cash_usd"],
+        "coin_units": state.get("stash_coin_units", 0.0), "pnl": pnl,
+        "note": f"regime={regime}"
     })
-    append_json_array(F_DET, {"ts_close": iso(ts_bar), "pnl_usd": pnl, "price_close": price})
 
     state["trade_coin_units"] = 0.0
+    state["coin_units"] = float(state.get("stash_coin_units", 0.0))
     state["position"] = "flat"
     state["entry_price"] = None
-
-    if pnl > 0 and SKIM_PROFIT_PCT > 0.0:
-        skim_usd_desired = pnl * SKIM_PROFIT_PCT
-        max_skim_allowed = max(0.0, state["cash_usd"] - STACK_FLOOR_USD)
-        skim_usd = min(skim_usd_desired, max_skim_allowed)
-        if skim_usd >= MIN_TRADE_USD / 2:
-            stash_units = skim_usd / price
-            state["cash_usd"] -= skim_usd
-            state["stash_coin_units"] += stash_units
-            state["coin_units"] = state["stash_coin_units"] + state["trade_coin_units"]
-            append_json_array(TRADES_PATH, {
-                "t": iso(ts_bar), "type": "skim_to_stash", "price": price,
-                "units": stash_units, "fee_usd": 0.0, "cash_usd": state["cash_usd"],
-                "coin_units": state["coin_units"], "note": f"skim {SKIM_PROFIT_PCT*100:.1f}% of profit"
-            })
-
     return "ok", None
 
+def maybe_monthly_rebalance(state, price, ts_bar_iso):
+    """
+    If stash > MAX% equity, trim back to TARGET% by selling part of stash.
+    """
+    if REBALANCE_DAYS <= 0: return
+    last_iso = state.get("last_rebalance_ts")
+    # parse ISO (support both "Z" and offset ISO)
+    def _parse_iso(x):
+        try:
+            return datetime.fromisoformat(x.replace("Z","+00:00")) if "Z" in x else datetime.fromisoformat(x)
+        except Exception:
+            return None
+    now_dt = _parse_iso(ts_bar_iso) or datetime.now(timezone.utc)
+    if last_iso:
+        last_dt = _parse_iso(last_iso)
+        if last_dt and (now_dt - last_dt) < timedelta(days=REBALANCE_DAYS):
+            return
+
+    eq = equity_now(state, price)
+    if eq <= 0: 
+        state["last_rebalance_ts"] = now_dt.isoformat(timespec='seconds'); 
+        return
+
+    stash_units = float(state.get("stash_coin_units", 0.0))
+    stash_val = stash_units * price
+    if eq > 0 and stash_val/eq <= REBALANCE_MAX_STASH_PCT:
+        state["last_rebalance_ts"] = now_dt.isoformat(timespec='seconds')
+        return
+
+    target_stash_val = REBALANCE_TARGET_STASH_PCT * eq
+    excess_val = max(0.0, stash_val - target_stash_val)
+    if excess_val < MIN_TRADE_USD:
+        state["last_rebalance_ts"] = now_dt.isoformat(timespec='seconds')
+        return
+
+    sell_units = min(stash_units, excess_val / price)
+    # execute "rebalance sell" from stash
+    gross = sell_units * price
+    fee = gross * FEE_RATE
+    cash_net = gross - fee
+
+    state["stash_coin_units"] = stash_units - sell_units
+    state["coin_units"] = state["stash_coin_units"] + state.get("trade_coin_units", 0.0)
+    state["cash_usd"] = float(state.get("cash_usd", 0.0)) + cash_net
+    state["fees_paid_usd"] = float(state.get("fees_paid_usd", 0.0)) + fee
+
+    append_json_array(TRADES_PATH, {
+        "t": ts_bar_iso, "type": "rebalance_sell", "price": price,
+        "units": -sell_units, "fee_usd": fee, "cash_usd": state["cash_usd"],
+        "coin_units": state["coin_units"],
+        "note": f"trim stash to {REBALANCE_TARGET_STASH_PCT:.2f} equity"
+    })
+    state["last_rebalance_ts"] = now_dt.isoformat(timespec='seconds')
+
+# ---- Strategy helpers ----
+def confirmed_up(fast, slow):
+    for i in range(1, CONFIRM_BARS+1):
+        if fast[-i] is None or slow[-i] is None or not (fast[-i] > slow[-i]): return False
+    return True
+
+def confirmed_down(fast, slow):
+    for i in range(1, CONFIRM_BARS+1):
+        if fast[-i] is None or slow[-i] is None or not (fast[-i] < slow[-i]): return False
+    return True
+
+def slope_pct_per_bar(series, bars):
+    if len(series) < bars+1: return 0.0
+    a = series[-bars-1]
+    b = series[-1]
+    if a is None or b is None or a == 0: return 0.0
+    return (b - a) / abs(a) / bars
+
+def detect_regime(fast, slow):
+    # use SMA slope + cross confirmation
+    s_fast = slope_pct_per_bar(fast, TREND_SLOPE_BARS)
+    s_slow = slope_pct_per_bar(slow, TREND_SLOPE_BARS)
+    up = confirmed_up(fast, slow) and s_fast > SLOPE_MIN_PCT_PER_BAR and s_slow >= 0
+    down = confirmed_down(fast, slow) and s_fast < -SLOPE_MIN_PCT_PER_BAR and s_slow <= 0
+    if up: return "up"
+    if down: return "down"
+    return "chop"
+
+# ---- Main loop ----
 def main():
     global SYMBOL
     exchange_class = getattr(ccxt, EXCHANGE)
     ex = exchange_class({"enableRateLimit": True})
 
-    try: SYMBOL = choose_symbol(ex, SYMBOL)
-    except Exception as e: print(f"[bot] symbol probe failed: {e}", flush=True)
+    try:
+        SYMBOL = choose_symbol(ex=ex, preferred=SYMBOL)
+    except Exception as e:
+        print(f"[bot] symbol probe failed: {e}", flush=True)
 
     state = ensure_state_defaults(load_json(STATE_PATH, {}))
     write_bot_config(SYMBOL)
@@ -258,47 +381,44 @@ def main():
             o=[c[1] for c in closed]; h=[c[2] for c in closed]; l=[c[3] for c in closed]
             c=[c[4] for c in closed]; v=[c[5] for c in closed]
             fast = sma(c, FAST); slow = sma(c, SLOW)
-            last_price = float(c[-1])
+            last_price = float(c[-1]); ts_iso = iso(last_ts)
 
-            # Hard Reset self-heal
+            # Hard reset self-heal
             state, _ = reseed_if_missing(state, last_price)
 
-            # Confirm
-            def confirmed_up():
-                for i in range(1, CONFIRM_BARS+1):
-                    if fast[-i] is None or slow[-i] is None or not (fast[-i] > slow[-i]): return False
-                return True
-            def confirmed_down():
-                for i in range(1, CONFIRM_BARS+1):
-                    if fast[-i] is None or slow[-i] is None or not (fast[-i] < slow[-i]): return False
-                return True
-
-            # Hysteresis
+            # Hysteresis (skip tiny spread when repeating same-side)
             anchor = slow[-1] if slow[-1] is not None else last_price
             spread = abs((fast[-1] if fast[-1] is not None else last_price) - anchor) / last_price
+            if spread <= THRESHOLD_PCT:
+                # only block if repeating same-side signal
+                same_side = ("buy" if confirmed_up(fast,slow) else "sell" if confirmed_down(fast,slow) else None)
+                if same_side and same_side == state.get("last_signal"):
+                    state["last_action"] = "skip"; state["skip_reason"] = f"hysteresis<{THRESHOLD_PCT}"
+                    atomic_write_json(STATE_PATH, state)
+                    sleep_until_next_close(tf_ms, last_ts); continue
 
             # Diagnostics aligned to CLOSED bar
             append_json_array(F_CAND, {
-                "ts": iso(last_ts), "o": o[-1], "h": h[-1], "l": l[-1], "c": c[-1], "v": v[-1],
+                "ts": ts_iso, "o": o[-1], "h": h[-1], "l": l[-1], "c": c[-1], "v": v[-1],
                 "fast": fast[-1], "slow": slow[-1],
-                "signal": "buy" if confirmed_up() else "sell" if confirmed_down() else "hold"
+                "signal": "buy" if confirmed_up(fast,slow) else "sell" if confirmed_down(fast,slow) else "hold"
             })
 
             # Snapshot
             state = ensure_state_defaults(state)
             state["symbol"] = SYMBOL
             state["last_price"] = last_price
-            state["unrealized_pnl_usd"] = (
-                (last_price - (state.get("entry_price") or last_price)) * float(state["trade_coin_units"])
-            )
-            state["equity_usd"] = float(state["cash_usd"]) + float(state["coin_units"]) * last_price
-            state["updated_at"] = iso(last_ts)
+            state["unrealized_pnl_usd"] = ((last_price - (state.get("entry_price") or last_price)) *
+                                           float(state.get("trade_coin_units",0.0)))
+            state["coin_units"] = float(state.get("stash_coin_units",0.0)) + float(state.get("trade_coin_units",0.0))
+            state["equity_usd"] = equity_now(state, last_price)
+            state["updated_at"] = ts_iso
             atomic_write_json(STATE_PATH, state)
-            append_json_array(F_SNAP, {"ts": iso(last_ts), "equity_usd": state["equity_usd"]})
+            append_json_array(F_SNAP, {"ts": ts_iso, "equity_usd": state["equity_usd"]})
             ensure_expected_files_exist(state)
 
-            # Consistency: no coins => flat
-            if float(state.get("coin_units", 0.0)) <= 0:
+            # Consistency: no tradable coins => flat
+            if float(state.get("trade_coin_units", 0.0)) <= 0 and state.get("position") != "flat":
                 state["position"] = "flat"; state["entry_price"] = None
                 atomic_write_json(STATE_PATH, state)
 
@@ -310,22 +430,21 @@ def main():
                     atomic_write_json(STATE_PATH, state)
                     sleep_until_next_close(tf_ms, last_ts); continue
 
-            # Threshold
-            if spread < THRESHOLD_PCT:
-                state["last_action"] = "skip"; state["skip_reason"] = f"spread<{THRESHOLD_PCT}"
-                atomic_write_json(STATE_PATH, state)
-                sleep_until_next_close(tf_ms, last_ts); continue
+            # Decide regime
+            regime = detect_regime(fast, slow)
 
             # Decide + act
             acted = False
-            if confirmed_up() and state["position"] != "long":
+            if confirmed_up(fast, slow) and state["position"] != "long":
                 ok, reason = place_buy(state, last_price, last_ts)
+                state["last_signal"] = "buy"
                 state["last_action"] = "buy" if ok=="ok" else "skip"
                 state["skip_reason"] = None if ok=="ok" else reason
                 atomic_write_json(STATE_PATH, state)
                 if ok=="ok": last_trade_bar_ts = last_ts; acted = True
-            elif confirmed_down() and state["position"] == "long":
-                ok, reason = place_sell_with_skim(state, last_price, last_ts)
+            elif confirmed_down(fast, slow) and state["position"] == "long":
+                ok, reason = place_sell_with_stack_dynamic(state, last_price, last_ts, regime)
+                state["last_signal"] = "sell"
                 state["last_action"] = "sell" if ok=="ok" else "skip"
                 state["skip_reason"] = None if ok=="ok" else reason
                 atomic_write_json(STATE_PATH, state)
@@ -335,6 +454,10 @@ def main():
                 state["last_action"] = "hold"; state["skip_reason"] = None
                 atomic_write_json(STATE_PATH, state)
 
+            # Monthly rebalance guard
+            maybe_monthly_rebalance(state, last_price, ts_iso)
+            atomic_write_json(STATE_PATH, state)
+
             sleep_until_next_close(tf_ms, last_ts)
 
         except Exception as e:
@@ -343,23 +466,33 @@ def main():
             sleep_until_next_close(tf_ms, last_ts)
             continue
 
+# ---- Bootstrap & run ----
+def choose_symbol(ex, preferred):
+    tries = [preferred] + (["BTC/USD"] if preferred=="BTC/USDT" else ["BTC/USDT"] if preferred=="BTC/USD" else [])
+    last = None
+    for sym in tries:
+        try:
+            raw = ex.fetch_ohlcv(sym, timeframe=TIMEFRAME, limit=10)
+            closed, _ = drop_forming(raw)
+            if closed: return sym
+        except Exception as e:
+            last = e
+    raise last or RuntimeError("No OHLCV")
+
 if __name__ == "__main__":
     exchange_class = getattr(ccxt, EXCHANGE)
     ex = exchange_class({"enableRateLimit": True})
     try:
         try_sym = SYMBOL
         try:
-            raw = ex.fetch_ohlcv(try_sym, timeframe=TIMEFRAME, limit=10)
-            closed,_ = drop_forming(raw)
+            raw = ex.fetch_ohlcv(try_sym, timeframe=TIMEFRAME, limit=10); closed,_ = drop_forming(raw)
             if not closed: raise RuntimeError("no closed candles")
         except Exception:
             try_sym = "BTC/USD" if SYMBOL=="BTC/USDT" else "BTC/USDT"
-            raw = ex.fetch_ohlcv(try_sym, timeframe=TIMEFRAME, limit=10)
-            closed,_ = drop_forming(raw)
+            raw = ex.fetch_ohlcv(try_sym, timeframe=TIMEFRAME, limit=10); closed,_ = drop_forming(raw)
         SYMBOL = try_sym
     except Exception as e:
         print(f"[bot] preflight symbol check failed: {e}", flush=True)
     write_bot_config(SYMBOL)
-    # Ensure empty trades files exist before entering loop
     ensure_expected_files_exist(ensure_state_defaults(load_json(STATE_PATH, {})))
     main()
