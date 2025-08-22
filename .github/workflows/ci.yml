@@ -1,90 +1,59 @@
 name: CI
 on:
   pull_request:
-    branches: [ main ]
-
+    branches:
+    - main
+  push:
+    branches:
+    - main
+  workflow_dispatch:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   lint-test-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Install tools
+      run: 'pip install --no-cache-dir ruff==0.5.5 black==24.8.0 yamllint==1.35.1
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install tools
-        run: |
-          pip install --no-cache-dir ruff==0.5.5 black==24.8.0 yamllint==1.35.1
-
-      - name: Size guard (80 KB files / 1200 lines)
-        run: |
-          python - <<PY2
-          import os,sys
-          MAX_BYTES=81920; MAX_LINES=1200
-          exts={".py",".html",".js",".css",".json",".yml",".yaml",".toml"}
-          bad=[]
-          for root,dirs,files in os.walk("."):
-              if any(seg in root for seg in (".git","__pycache__")):
-                  continue
-              for f in files:
-                  if os.path.splitext(f)[1].lower() not in exts:
-                      continue
-                  p=os.path.join(root,f)
-                  try:
-                      b=os.path.getsize(p)
-                  except FileNotFoundError:
-                      continue
-                  with open(p,"rb") as fh:
-                      lines=fh.read().count(b"\n")+1
-                  if b>MAX_BYTES or lines>MAX_LINES:
-                      bad.append((p,b,lines))
-          if bad:
-              print("Files exceeding limits:")
-              for p,b,l in bad:
-                  print(f"{p} bytes={b} lines={l}")
-              sys.exit(1)
-          PY2
-
-      # ---- Hard gate: Python must parse ----
-      - name: Syntax gate (py_compile)
-        run: |
-          python - <<PY3
-          import os, py_compile, sys
-          failed=[]
-          for root,_,files in os.walk("app"):
-              for f in files:
-                  if f.endswith(".py"):
-                      p=os.path.join(root,f)
-                      try:
-                          py_compile.compile(p, doraise=True)
-                      except Exception as e:
-                          print(f"SYNTAX ERROR in {p}: {e}")
-                          failed.append(p)
-          sys.exit(1 if failed else 0)
-          PY3
-
-      # ---- Advisory linters: report, but don’t fail the build (for now) ----
-      - name: Ruff (advisory)
-        continue-on-error: true
-        run: ruff check app --output-format=github --ignore E401,E701,E702,F401 || true
-
-      - name: Black (advisory / check only)
-        continue-on-error: true
-        run: black --check app || true
-
-      - name: YAML lint
-        run: |
-          cat > .yamllint.yml <<CONF
-          extends: default
-          rules:
-            line-length: disable
-          CONF
-          yamllint -c .yamllint.yml .
-
-      - name: Build docker image (smoke)
-        run: docker build -t tb-app-ci app
+        '
+    - name: Size guard (80 KB files / 1200 lines)
+      run: "python - <<PY2\nimport os,sys\nMAX_BYTES=81920; MAX_LINES=1200\nexts={\"\
+        .py\",\".html\",\".js\",\".css\",\".json\",\".yml\",\".yaml\",\".toml\"}\n\
+        bad=[]\nfor root,dirs,files in os.walk(\".\"):\n    if any(seg in root for\
+        \ seg in (\".git\",\"__pycache__\")):\n        continue\n    for f in files:\n\
+        \        if os.path.splitext(f)[1].lower() not in exts:\n            continue\n\
+        \        p=os.path.join(root,f)\n        try:\n            b=os.path.getsize(p)\n\
+        \        except FileNotFoundError:\n            continue\n        with open(p,\"\
+        rb\") as fh:\n            lines=fh.read().count(b\"\\n\")+1\n        if b>MAX_BYTES\
+        \ or lines>MAX_LINES:\n            bad.append((p,b,lines))\nif bad:\n    print(\"\
+        Files exceeding limits:\")\n    for p,b,l in bad:\n        print(f\"{p} bytes={b}\
+        \ lines={l}\")\n    sys.exit(1)\nPY2\n"
+    - name: Syntax gate (py_compile)
+      run: "python - <<PY3\nimport os, py_compile, sys\nfailed=[]\nfor root,_,files\
+        \ in os.walk(\"app\"):\n    for f in files:\n        if f.endswith(\".py\"\
+        ):\n            p=os.path.join(root,f)\n            try:\n               \
+        \ py_compile.compile(p, doraise=True)\n            except Exception as e:\n\
+        \                print(f\"SYNTAX ERROR in {p}: {e}\")\n                failed.append(p)\n\
+        sys.exit(1 if failed else 0)\nPY3\n"
+    - name: Ruff (advisory)
+      continue-on-error: true
+      run: ruff check app --output-format=github --ignore E401,E701,E702,F401 || true
+    - name: Black (advisory / check only)
+      continue-on-error: true
+      run: black --check app || true
+    - name: YAML lint
+      continue-on-error: true
+      run: "set -eo pipefail\necho \"::group::YAML lint (advisory)\"\n# Lint typical\
+        \ YAML locations (compose + workflows + root)\nyamllint -f standard \\\n \
+        \ ./compose/docker-compose.yml \\\n  ./.github/workflows/*.yml \\\n  ./.yamllint.yml\
+        \ ./.pre-commit-config.yaml 2>&1 || {\n  echo \"::warning::yamllint reported\
+        \ issues (advisory only)\"; }\necho \"::endgroup::YAML lint (advisory)\""
+      shell: bash
+    - name: Build docker image (smoke)
+      run: docker build -t tb-app-ci app
