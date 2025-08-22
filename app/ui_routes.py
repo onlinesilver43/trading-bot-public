@@ -81,7 +81,8 @@ def api_export_zip():
         raise HTTPException(status_code=404, detail="No diagnostics files exist yet.")
     buf = zip_dirs(present, zip_root="")
     return StreamingResponse(buf, media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename="trading-bot-export.zip"'})
+    headers={'Content-Disposition': 'attachment; filename="trading-bot-source.zip"'}
+    )
 
 @app.get("/api/source.zip")
 def api_source_zip():
@@ -94,7 +95,8 @@ def api_source_zip():
     if buf is None:
         raise HTTPException(404, "No source directories are mounted in UI container.")
     return StreamingResponse(buf, media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename=\"trading-bot-source.zip\""})
+    headers={'Content-Disposition': 'attachment; filename="trading-bot-source.zip"'}
+    )
 
 @app.post("/api/reset")
 def api_reset():

@@ -1,5 +1,5 @@
 import uuid
-from app.core.utils import save_json if False else None  # editor hint
+from app.core.utils import save_json  # editor hint
 
 from app.core.utils import iso_from_ms, now_iso
 from app.state.store import save_json, load_json

@@ -1,82 +1,31 @@
-name: Rollback to Ref
+name: Rollback
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: "Git ref (SHA/tag/branch). Leave empty to auto-use last successful 'Deploy to Droplet'."
-        required: false
-        default: ""
-permissions:
-  contents: read
+      tag:
+        description: "Deploy tag to redeploy (deploy-YYYYMMDD-HHMM-<sha>)"
+        required: true
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: true
 jobs:
-  rollback:
+  redeploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve target ref (auto last green if empty)
-        id: res
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          REF="${{ github.event.inputs.ref }}"
-          if [ -z "$REF" ]; then
-            URL="https://api.github.com/repos/${{ github.repository }}/actions/workflows/deploy.yml/runs?status=success&branch=main&per_page=1"
-            REF=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$URL" | jq -r '.workflow_runs[0].head_sha')
-            [ "$REF" != "null" ] && [ -n "$REF" ] || { echo "No successful deploy found"; exit 1; }
-          fi
-          echo "TARGET_REF=$REF" >> $GITHUB_ENV
-          echo "TARGET_SHORT=${REF:0:7}" >> $GITHUB_ENV
-          echo "ref=$REF" >> $GITHUB_OUTPUT
-
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ env.TARGET_REF }}
-
-      - name: Package ref
-        run: git archive --format=tar.gz -o package.tgz ${{ env.TARGET_REF }}
-
-      - name: Upload package to droplet
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.TB_HOST }}
-          username: ${{ secrets.TB_USER }}
-          password: ${{ secrets.TB_PASS }}
-          source: "package.tgz"
-          target: "/srv/trading-bots-repo"
-
-      - name: Deploy selected ref on droplet
-        uses: appleboy/ssh-action@v1.0.3
+        with: { ref: ${{ inputs.tag }} }
+      - name: Redeploy tag
         env:
-          SHA_SHORT: ${{ env.TARGET_SHORT }}
-        with:
-          host: ${{ secrets.TB_HOST }}
-          username: ${{ secrets.TB_USER }}
-          password: ${{ secrets.TB_PASS }}
-          script: |
-            set -e
-            REL_BASE=/srv/trading-bots/_releases
-            REL_DIR="$REL_BASE/${SHA_SHORT}-$(date +%Y%m%d%H%M%S)"
-            mkdir -p /srv/trading-bots /srv/trading-bots-repo "$REL_BASE" "$REL_DIR"
-            tar -xzf /srv/trading-bots-repo/package.tgz -C "$REL_DIR"
-            # track previous/current release pointers
-            if [ -L "$REL_BASE/current" ]; then
-              CURR="$(readlink -f "$REL_BASE/current")" || true
-              [ -n "$CURR" ] && ln -sfn "$CURR" "$REL_BASE/previous"
-            fi
-            ln -sfn "$REL_DIR" "$REL_BASE/current"
-
-            # sync release -> live (keep data/logs/.env and ignore _diag)
-            rsync -a --delete --delete-delay --force \
-              --exclude data --exclude logs --exclude .env --exclude _diag/ \
-              "$REL_DIR"/ /srv/trading-bots/
-
-            # re-create .env from secrets (if present)
-            : > /srv/trading-bots/.env
-            [ -n "${{ secrets.BINANCE_API_KEY }}" ] && printf "BINANCE_API_KEY=%s\n" "${{ secrets.BINANCE_API_KEY }}" >> /srv/trading-bots/.env
-            [ -n "${{ secrets.BINANCE_API_SECRET }}" ] && printf "BINANCE_API_SECRET=%s\n" "${{ secrets.BINANCE_API_SECRET }}" >> /srv/trading-bots/.env
-
-            # rebuild & restart
-            docker compose -f /srv/trading-bots/compose/docker-compose.yml up -d --build
-
-            echo "Rolled back to $SHA_SHORT"
+          TB_HOST: ${{ secrets.TB_HOST }}
+          TB_PW:   ${{ secrets.TB_PW }}
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y sshpass
+          sshpass -p "$TB_PW" ssh -o StrictHostKeyChecking=no "$TB_HOST" "bash -s" <<'SH'
+          set -euo pipefail
+          cd /srv/trading-bots
+          git fetch --all --tags --prune
+          git checkout -f "${ROLLBACK_TAG}"
+          docker compose -p tb -f compose/docker-compose.yml up -d --build --remove-orphans
+          SH
+        env:
+          ROLLBACK_TAG: ${{ inputs.tag }}

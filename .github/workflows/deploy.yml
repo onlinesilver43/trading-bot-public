@@ -1,50 +1,45 @@
 name: Deploy to Droplet
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch: {}
+    tags:
+      - "deploy-*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Ref to deploy (tag or SHA)"
+        required: false
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: true
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        # For tag pushes, GitHub checks out the tag automatically.
+        # For manual dispatch, pass a ref input if you want.
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.inputs.ref || github.ref }}
 
-      - name: Package repo (git archive)
-        run: git archive --format=tar.gz -o package.tgz HEAD
+      - name: Build docker image (smoke)
+        run: docker build -t tb-app:latest app
 
-      - name: Upload package
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.TB_HOST }}
-          username: ${{ secrets.TB_USER }}
-          password: ${{ secrets.TB_PASS }}
-          source: "package.tgz"
-          target: "/srv/trading-bots-repo"
-
-      - name: Deploy on server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.TB_HOST }}
-          username: ${{ secrets.TB_USER }}
-          password: ${{ secrets.TB_PASS }}
-          script: |
-            set -e
-            mkdir -p /srv/trading-bots /srv/trading-bots-repo
-            cd /srv/trading-bots-repo
-            tar -xzf package.tgz && rm -f package.tgz
-
-            # sync repo -> live (keep data/logs/.env and ignore diag)
-            rsync -a --delete --delete-delay --force \
-              --exclude data --exclude logs --exclude .env --exclude _diag/ \
-              /srv/trading-bots-repo/ /srv/trading-bots/
-
-            # write .env AFTER rsync so --delete won't remove it
-            : > /srv/trading-bots/.env
-            printf "BINANCE_API_KEY=%s\n" "${{ secrets.BINANCE_API_KEY }}"   >> /srv/trading-bots/.env
-            printf "BINANCE_API_SECRET=%s\n" "${{ secrets.BINANCE_API_SECRET }}" >> /srv/trading-bots/.env
-
-            # rebuild & restart
-            docker compose -p tb -f /srv/trading-bots/compose/docker-compose.yml down --remove-orphans 
-            docker compose -p tb -f /srv/trading-bots/compose/docker-compose.yml up -d --build --remove-orphans
+      - name: Ship to droplet and restart (compose up)
+        env:
+          TB_HOST: ${{ secrets.TB_HOST }}
+          TB_PW:   ${{ secrets.TB_PW }}
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y sshpass
+          sshpass -p "$TB_PW" ssh -o StrictHostKeyChecking=no "$TB_HOST" "bash -s" <<'SH'
+          set -euo pipefail
+          cd /srv/trading-bots
+          if [ ! -d .git ]; then
+            git init
+            git remote add origin https://github.com/${GITHUB_REPOSITORY}.git
+          fi
+          git fetch --all --tags --prune
+          # checkout the exact ref this job is running on (tag for tag-push)
+          REF="${GITHUB_REF_NAME:-main}"
+          git checkout -f "$REF"
+          docker compose -p tb -f compose/docker-compose.yml up -d --build --remove-orphans
+          SH

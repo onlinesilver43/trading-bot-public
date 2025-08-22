@@ -1,0 +1,24 @@
+name: Tag on Merge
+on:
+  pull_request:
+    types: [closed]
+    branches: [ main ]
+permissions:
+  contents: write
+jobs:
+  tag-if-deploy:
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'deploy')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - name: Create deploy tag
+        id: make
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          TAG="deploy-$(date -u +%Y%m%d-%H%M)-$SHA"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          git tag -a "$TAG" -m "Auto deploy tag for $SHA"
+          git push origin "$TAG"
+      - name: Echo
+        run: echo "Created tag ${{ steps.make.outputs.tag }}"
