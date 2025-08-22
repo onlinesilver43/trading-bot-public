@@ -1,5 +1,7 @@
 name: CI
-true:
+
+
+on:
   pull_request:
     branches:
     - main
@@ -7,6 +9,7 @@ true:
     branches:
     - main
   workflow_dispatch:
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
