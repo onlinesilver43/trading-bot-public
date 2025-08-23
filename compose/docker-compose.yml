@@ -2,23 +2,26 @@ services:
   bot:
     build: ../app
     image: tb-app:latest
-    command: ["python","/app/bot.py"]   # stays as-is unless you switched to bot_main.py
+    command: ["python","/app/bot.py"]
     env_file:
       - ../.env
     environment:
       EXCHANGE: "binanceus"
-      SYMBOL: "BTC/USDT"       # or "BTC/USD" on Binance.US
+      SYMBOL: "BTC/USDT"
       TIMEFRAME: "1m"
       FAST: "7"
       SLOW: "25"
-      ORDER_SIZE_USD: "20"
+      # --- sizing via % of equity ---
+      ORDER_PCT_EQUITY: "0.08"
+      ORDER_SIZE_USD: "0"
       START_CASH_USD: "200"
       START_COIN_UNITS: "0"
       FEE_RATE: "0.001"
-      CONFIRM_BARS: "2"
-      MIN_HOLD_BARS: "3"
-      THRESHOLD_PCT: "0.0003"
-      MIN_TRADE_USD: "10"
+      # --- discipline & hysteresis ---
+      CONFIRM_BARS: "1"
+      MIN_HOLD_BARS: "2"
+      THRESHOLD_PCT: "0.0005"
+      MIN_TRADE_USD: "5"
       LOOP_SECONDS: "20"
       STATE_PATH: "/data/paper_state.json"
       TRADES_PATH: "/data/paper_trades.json"
