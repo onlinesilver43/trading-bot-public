@@ -9,7 +9,6 @@ services:
       STRAT_PROFILE: "blended_1000"
       EXCHANGE: "binanceus"
       SYMBOL: "BTC/USDT"
-      TIMEFRAME: "1m"
       STATE_PATH: "/data/paper_state.json"
       TRADES_PATH: "/data/paper_trades.json"
     volumes:
