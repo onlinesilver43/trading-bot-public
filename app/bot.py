@@ -4,7 +4,7 @@ import ccxt
 
 # ---------- Config loader (profiles + strict allowlist overrides) ----------
 PROFILE_DIR = os.path.join(os.path.dirname(__file__), "config", "strategies")
-# Try both /app/config/strategies (in image) and /config/strategies (if ever bind-mounted)
+# Try both /app/config/strategies (in image) and /config/strategies (bind-mount fallback)
 if not os.path.isdir(PROFILE_DIR):
     alt = "/config/strategies"
     if os.path.isdir(alt):
@@ -20,27 +20,26 @@ def load_profile():
             cfg = json.load(f)
     except Exception as e:
         raise RuntimeError(f"Cannot load profile '{name}': {e}")
-    # minimal validation
-    required = ["EXCHANGE","SYMBOL","TIMEFRAME","FAST","SLOW","CONFIRM_BARS","MIN_HOLD_BARS",
-                "THRESHOLD_PCT","FEE_RATE","SLIPPAGE_BP","START_CASH_USD","MIN_TRADE_USD",
-                "RETAIN_PCT_UP","RETAIN_PCT_CHOP","RETAIN_PCT_DOWN","CASH_FLOOR_PCT",
-                "REBALANCE_DAYS","REBALANCE_MAX_STASH_PCT","REBALANCE_TARGET_STASH_PCT"]
+    required = [
+        "EXCHANGE","SYMBOL","TIMEFRAME","FAST","SLOW","CONFIRM_BARS","MIN_HOLD_BARS",
+        "THRESHOLD_PCT","FEE_RATE","SLIPPAGE_BP","START_CASH_USD","MIN_TRADE_USD",
+        "RETAIN_PCT_UP","RETAIN_PCT_CHOP","RETAIN_PCT_DOWN","CASH_FLOOR_PCT",
+        "REBALANCE_DAYS","REBALANCE_MAX_STASH_PCT","REBALANCE_TARGET_STASH_PCT"
+    ]
     missing = [k for k in required if k not in cfg]
     if missing:
         raise RuntimeError(f"Profile '{name}' missing keys: {missing}")
-
-    # apply safe env overrides
-    # - STRAT_PROFILE handled above; kept for logging parity
-    # - TIMEFRAME override lets you flip tf operationally
-    # - ORDER_PCT_EQUITY override for quick sizing tweak if needed
+    # safe overrides
     for k in ALLOW_ENV_OVERRIDES:
-        if k in ("STRAT_PROFILE",): continue
+        if k == "STRAT_PROFILE":  # already used
+            continue
         v = os.getenv(k)
-        if v is not None and v != "":
-            if k == "ORDER_PCT_EQUITY":
-                cfg[k] = float(v)
-            elif k == "TIMEFRAME":
-                cfg[k] = v
+        if v is None or v == "":
+            continue
+        if k == "ORDER_PCT_EQUITY":
+            cfg[k] = float(v)
+        elif k == "TIMEFRAME":
+            cfg[k] = v
     cfg["_profile_name"] = name
     return cfg
 
@@ -90,6 +89,8 @@ REBALANCE_MAX_STASH_PCT     = float(CFG.get("REBALANCE_MAX_STASH_PCT", 0.70))
 REBALANCE_TARGET_STASH_PCT  = float(CFG.get("REBALANCE_TARGET_STASH_PCT", 0.60))
 
 SKIM_PROFIT_PCT = float(CFG.get("SKIM_PROFIT_PCT", 0))
+# no-dust retain guard (USD) — if retained value < this, do not stash
+MIN_RETAIN_USD  = float(CFG.get("MIN_RETAIN_USD", 2.0))
 
 # ---------- Helpers ----------
 def tf_to_ms(tf: str) -> int:
@@ -264,7 +265,10 @@ def place_sell_with_stack_dynamic(state, price, ts_bar, regime):
     floor_cash = CASH_FLOOR_PCT * eq
     effective_pct = base_pct if cash >= floor_cash else 0.0
 
+    # compute retain; drop if under MIN_RETAIN_USD ("no-dust retain")
     retain_units = max(0.0, min(trade_units, trade_units * effective_pct))
+    if retain_units * price < MIN_RETAIN_USD:
+        retain_units = 0.0
 
     if retain_units > 0:
         state["trade_coin_units"] = float(trade_units - retain_units)
@@ -274,7 +278,7 @@ def place_sell_with_stack_dynamic(state, price, ts_bar, regime):
             "t": iso(ts_bar), "type": "retain_to_stash", "price": price,
             "units": retain_units, "fee_usd": 0.0,
             "cash_usd": state.get("cash_usd"), "coin_units": state["coin_units"],
-            "note": f"regime={regime}, pct={effective_pct:.3f}"
+            "note": f"regime={regime}, pct={effective_pct:.3f}, min_retain_usd={MIN_RETAIN_USD}"
         })
 
     sell_units = float(state["trade_coin_units"])
@@ -377,6 +381,13 @@ def detect_regime(fast, slow):
     if down: return "down"
     return "chop"
 
+# ---------- Candle append de-dupe ----------
+def append_candle_if_new(obj):
+    arr = load_json(F_CAND, [])
+    if arr and isinstance(arr[-1], dict) and arr[-1].get("ts") == obj.get("ts"):
+        return  # same closed bar already logged
+    append_json_array(F_CAND, obj)
+
 # ---------- Main loop ----------
 def main():
     global SYMBOL
@@ -409,6 +420,7 @@ def main():
 
             state, _ = reseed_if_missing(state, last_price)
 
+            # Hysteresis against same-side repeats
             anchor = slow[-1] if slow[-1] is not None else last_price
             spread = abs((fast[-1] if fast[-1] is not None else last_price) - anchor) / last_price
             if spread <= THRESHOLD_PCT:
@@ -418,12 +430,14 @@ def main():
                     atomic_write_json(STATE_PATH, state)
                     sleep_until_next_close(tf_ms, last_ts); continue
 
-            append_json_array(F_CAND, {
+            # Diagnostics (closed-bar aligned) with de-dupe
+            append_candle_if_new({
                 "ts": ts_iso, "o": o[-1], "h": h[-1], "l": l[-1], "c": c[-1], "v": v[-1],
                 "fast": fast[-1], "slow": slow[-1],
                 "signal": "buy" if confirmed_up(fast,slow) else "sell" if confirmed_down(fast,slow) else "hold"
             })
 
+            # Snapshot
             state = ensure_state_defaults(state)
             state["symbol"] = SYMBOL
             state["last_price"] = last_price
@@ -436,10 +450,12 @@ def main():
             append_json_array(F_SNAP, {"ts": ts_iso, "equity_usd": state["equity_usd"]})
             ensure_expected_files_exist(state)
 
+            # Consistency: no coins => flat
             if float(state.get("trade_coin_units", 0.0)) <= 0 and state.get("position") != "flat":
                 state["position"] = "flat"; state["entry_price"] = None
                 atomic_write_json(STATE_PATH, state)
 
+            # Cooldown
             if last_trade_bar_ts is not None:
                 bars_since = sum(1 for ts, *_ in closed if ts > last_trade_bar_ts)
                 if bars_since < MIN_HOLD_BARS:
@@ -447,8 +463,10 @@ def main():
                     atomic_write_json(STATE_PATH, state)
                     sleep_until_next_close(tf_ms, last_ts); continue
 
+            # Regime
             regime = detect_regime(fast, slow)
 
+            # Actions
             acted = False
             if confirmed_up(fast, slow) and state["position"] != "long":
                 ok, reason = place_buy(state, last_price, last_ts)
@@ -480,7 +498,7 @@ def main():
             sleep_until_next_close(tf_ms, last_ts)
             continue
 
-# (secondary choose_symbol kept for robustness in main guard)
+# secondary choose_symbol also used in main guard
 def choose_symbol(ex, preferred):
     tries = [preferred] + (["BTC/USD"] if preferred=="BTC/USDT" else ["BTC/USDT"] if preferred=="BTC/USD" else [])
     last = None
