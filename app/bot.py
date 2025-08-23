@@ -3,7 +3,13 @@ from datetime import datetime, timezone, timedelta
 import ccxt
 
 # ---------- Config loader (profiles + strict allowlist overrides) ----------
-PROFILE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "strategies")
+PROFILE_DIR = os.path.join(os.path.dirname(__file__), "config", "strategies")
+# Try both /app/config/strategies (in image) and /config/strategies (if ever bind-mounted)
+if not os.path.isdir(PROFILE_DIR):
+    alt = "/config/strategies"
+    if os.path.isdir(alt):
+        PROFILE_DIR = alt
+
 ALLOW_ENV_OVERRIDES = {"STRAT_PROFILE", "TIMEFRAME", "ORDER_PCT_EQUITY"}
 
 def load_profile():
