@@ -6,7 +6,7 @@ services:
     env_file:
       - ../.env
     environment:
-      STRAT_PROFILE: "blended_1000_balanced"
+      STRAT_PROFILE: "blended_1000_trendonly"
       EXCHANGE: "binanceus"
       SYMBOL: "BTC/USDT"
       STATE_PATH: "/data/paper_state.json"
