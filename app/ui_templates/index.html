@@ -1,2 +1,116 @@
-<script>fetch("/api/meta").then(r=>r.json()).then(m=>{const el=document.getElementById("buildmeta"); if(el){const short=(m.commit||"").slice(0,7); el.textContent=`Deployed: ${m.branch} @ ${m.deploy_tag} ${short?"(":""}${short}${short?")":""}`;}}).catch(()=>{});</script>
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  <title>Trading Bots – Status</title>
+  <style>
+    :root { --blue:#0b3d91; --bg:#0f1117; --fg:#e6edf3; --muted:#9aa4b2; }
+    html,body { margin:0; padding:0; background:#fff; color:#111; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+    #buildmeta { background:var(--blue); color:#fff; padding:6px 10px; font-weight:500; }
+    .container { max-width:1100px; margin:18px auto; padding:0 12px; }
+    h1 { margin:0 0 12px 0; font-size:20px; }
+    .muted { color:#666; }
+    .grid {
+      display:grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr)); gap:12px;
+    }
+    .card {
+      border:1px solid #e6e8eb; border-radius:10px; padding:12px;
+      box-shadow:0 1px 2px rgba(0,0,0,.04);
+      background:#fff;
+    }
+    code { background:#f6f8fa; border-radius:6px; padding:2px 6px; }
+    a.button { display:inline-block; padding:8px 10px; border-radius:8px; text-decoration:none; background:#111; color:#fff; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  </style>
+</head>
+<body>
+
+  <!-- Build meta banner (populated by /api/meta) -->
+  <div id="buildmeta">Loading build info…</div>
+
+  <div class="container">
+    <h1>Trading Bots – Status</h1>
+    <div class="row muted" id="summary"></div>
+
+    <div class="grid" style="margin-top:12px">
+      <div class="card">
+        <h3 style="margin:0 0 6px 0">Actions</h3>
+        <div class="row">
+          <a class="button" href="/api/source.zip">Export Source (ZIP)</a>
+          <a class="button" href="/api/export.zip">Export Diagnostics (ZIP)</a>
+          <a class="button" href="/exports">Exports</a>
+          <a class="button" href="/logs">Logs</a>
+        </div>
+        <p class="muted" style="margin-top:8px">UI refreshes every 2s. Root shows status + recent trades; API stays compatible.</p>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 6px 0">Recent Trades</h3>
+        <div id="trades" class="muted">Loading…</div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 6px 0">Engine</h3>
+        <div id="engine" class="muted">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Populate build meta banner (safe if /api/meta missing) ---
+    (function(){
+      const el = document.getElementById("buildmeta");
+      fetch("/api/meta").then(r => r.ok ? r.json() : null).then(m => {
+        if (!m || !el) return;
+        const short = (m.commit || "").slice(0,7);
+        el.textContent = `Deployed: ${m.branch} @ ${m.deploy_tag}` + (short ? ` (${short})` : "");
+      }).catch(()=>{ /* leave default text */ });
+    })();
+
+    // --- Render summary/trades from /api/state (read‑only; won’t break if absent) ---
+    (function refresh(){
+      fetch("/api/state").then(r => r.ok ? r.json() : null).then(data => {
+        if (!data || !data.state) return;
+        const s = data.state;
+        const summary = document.getElementById("summary");
+        const engine  = document.getElementById("engine");
+        const trades  = document.getElementById("trades");
+
+        if (summary) {
+          summary.innerHTML = `
+            <div>Symbol: <code>${s.symbol || "?"}</code></div>
+            <div>Equity: <code>$${(s.equity_usd ?? 0).toFixed(2)}</code></div>
+            <div>Cash: <code>$${(s.cash_usd ?? 0).toFixed(2)}</code></div>
+            <div>Coins: <code>${(s.coin_units ?? 0).toFixed(8)}</code></div>
+            <div>Last: <code>${s.last_action || "-"}</code></div>
+            <div>Signal: <code>${s.last_signal || "-"}</code></div>
+            <div>Updated: <code>${s.updated_at || "-"}</code></div>
+          `;
+        }
+        if (engine) {
+          engine.innerHTML = `
+            Timeframe: <code>${s.timeframe || "?"}</code><br/>
+            Profile: <code>${s.profile || "-"}</code><br/>
+            Position: <code>${s.position || "-"}</code><br/>
+            Skip reason: <code>${s.skip_reason || "-"}</code>
+          `;
+        }
+        if (trades) {
+          const ts = (data.trades || []).slice(-8).reverse();
+          if (!ts.length) { trades.textContent = "No trades yet."; return; }
+          trades.innerHTML = ts.map(t => {
+            const u = typeof t.units === "number" ? t.units : 0;
+            const amt = Math.abs(u).toFixed(8);
+            const typ = (t.type || "").toUpperCase();
+            return `<div>• ${t.t} — <code>${typ}</code> @ <code>${t.price}</code> (${amt} units)</div>`;
+          }).join("");
+        }
+      }).catch(()=>{}).finally(()=>setTimeout(refresh, 2000));
+    })();
+  </script>
+</body>
+</html>
