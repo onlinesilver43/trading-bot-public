@@ -44,6 +44,9 @@ jobs:
             : > /srv/trading-bots/.env
             printf "BINANCE_API_KEY=%s\n" "${{ secrets.BINANCE_API_KEY }}"   >> /srv/trading-bots/.env
             printf "BINANCE_API_SECRET=%s\n" "${{ secrets.BINANCE_API_SECRET }}" >> /srv/trading-bots/.env
+echo "GIT_BRANCH=${GITHUB_REF_NAME}" >> /srv/trading-bots/.env
+echo "DEPLOY_TAG=${GITHUB_REF##*/}"   >> /srv/trading-bots/.env
+echo "GIT_SHA=${GITHUB_SHA::7}"       >> /srv/trading-bots/.env
 
             # rebuild & restart
             docker compose -p tb -f /srv/trading-bots/compose/docker-compose.yml down --remove-orphans 
