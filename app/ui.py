@@ -42,113 +42,12 @@ def zip_dirs(pairs, zip_root: str):
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    # Serve template; fall back to previous inline HTML if the file is missing
+    path = os.path.join(os.path.dirname(__file__), "ui_templates", "index.html")
     try:
-        tpl = os.path.join(os.path.dirname(__file__), "ui_templates", "index.html")
-        with open(tpl, "r", encoding="utf-8") as f:
-            html = f.read()
-    except Exception:
-        # fallback: keep your previous inline UI (unchanged)
-        html = """
-<!doctype html><html><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Trading Bots – Status</title>
-<style>
-:root{--bg:#0b1020;--card:#141a2d;--text:#e8ecff;--muted:#9aa4c7;--accent:#6ea8fe;--warn:#ffb74d;--green:#41d1a7;--red:#ff6b6b}
-*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial}
-h1{margin:0 0 16px;font-size:28px}.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
-.label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}.value{font-weight:700;font-size:20px}
-.row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
-.btn{display:inline-block;padding:8px 10px;border-radius:10px;background:#1c2440;color:#fff;text-decoration:none;border:1px solid #2b375f}
-.badge{display:inline-block;padding:2px 6px;border-radius:6px;background:#1c2440;border:1px solid #2b375f;color:#c8d3ff}
-table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;border-bottom:1px solid #223}
-kbd{background:#10162a;border:1px solid #2b375f;border-bottom-color:#172040;border-radius:6px;padding:1px 6px;color:#cbd5ff}
-.small{font-size:12px;color:var(--muted)}
-.mono{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace}
-.ok{color:var(--green)}.warn{color:var(--warn)}.err{color:var(--red)}
-/* scroll */
-pre,code{white-space:pre-wrap;word-break:break-word}
-</style>
-</head><body>
-<h1>Trading Bots – Status</h1>
-<div class="grid">
-  <div class="card">
-    <div class="row">
-      <div><div class="label">Symbol</div><div class="value mono" id="symbol">-</div></div>
-      <div><div class="label">Equity</div><div class="value mono" id="equity">-</div></div>
-      <div><div class="label">Cash</div><div class="value mono" id="cash">-</div></div>
-      <div><div class="label">Coins</div><div class="value mono" id="coins">-</div></div>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <a class="btn" href="/api/export.zip">Export Diagnostics (ZIP)</a>
-      <a class="btn" href="/api/source.zip">Export Source (ZIP)</a>
-      <a class="btn" href="/exports">Exports</a>
-      <a class="btn" href="/logs">Logs</a>
-      <span class="small">UI refreshes every 2s</span>
-    </div>
-  </div>
-  <div class="card"><div class="label">Recent Trades</div><div id="trades" class="small">Loading…</div></div>
-  <div class="card"><div class="label">Engine</div><div id="engine" class="small">Loading…</div></div>
-</div>
-<div class="card" style="margin-top:16px">
-  <div class="row">
-    <div>
-      <div class="label">Actions</div>
-      <div class="small">Hard reset deletes <code>paper_state.json</code>, <code>paper_trades.json</code>, <code>trades_detailed.json</code>, <code>state_snapshots.json</code>, <code>candles_with_signals.json</code>, <code>bot_config.json</code>.</div>
-    </div>
-    <div class="row"><button class="btn" id="hardReset">Hard Reset (paper)</button></div>
-  </div>
-</div>
-<script>
-/* existing logic – unchanged */
-const $ = sel => document.querySelector(sel);
-async function refresh(){
-  try{
-    const r=await fetch("/api/state");
-    if(!r.ok) return;
-    const j=await r.json();
-    const s=j.state||{};
-    $("#symbol").textContent = s.symbol || "-";
-    $("#equity").textContent = typeof s.equity_usd==="number"? `$${s.equity_usd.toFixed(2)}` : "-";
-    $("#cash").textContent   = typeof s.cash_usd==="number"? `$${s.cash_usd.toFixed(2)}` : "-";
-    $("#coins").textContent  = typeof s.coin_units==="number"? s.coin_units.toFixed(8) : "-";
-    const engine = document.querySelector("#engine");
-    if(engine){
-      engine.innerHTML = `
-        Timeframe: <span class="mono">${s.timeframe||"-"}</span><br/>
-        Profile: <span class="mono">${s.profile||"-"}</span><br/>
-        Position: <span class="mono">${s.position||"-"}</span><br/>
-        Last: <span class="mono">${s.last_action||"-"}</span> / Signal: <span class="mono">${s.last_signal||"-"}</span><br/>
-        Updated: <span class="mono">${s.updated_at||"-"}</span><br/>
-        Skip reason: <span class="mono">${s.skip_reason||"-"}</span>`;
-    }
-    const trades = document.querySelector("#trades");
-    if(trades){
-      const ts = (j.trades||[]).slice(-12).reverse();
-      if(!ts.length){ trades.textContent="No trades yet."; }
-      else{
-        trades.innerHTML = ts.map(t=>{
-          const u = typeof t.units==="number" ? t.units : 0;
-          const amt = Math.abs(u).toFixed(8);
-          const typ = (t.type||"").toUpperCase();
-          const fee = typeof t.fee_usd==="number" ? `, fee $${t.fee_usd.toFixed(2)}` : "";
-          return `<div>• ${t.t} — <span class="mono">${typ}</span> @ <span class="mono">${t.price}</span> (${amt}u${fee})</div>`;
-        }).join("");
-      }
-    }
-  }catch(e){} finally{ setTimeout(refresh, 2000); }
-}
-refresh();
-document.getElementById("hardReset")?.addEventListener("click", async ()=>{
-  if(!confirm("Hard reset paper state and diagnostics?")) return;
-  const r = await fetch("/api/reset", {method:"POST"}); let j={}; try{ j=await r.json(); }catch(_){}
-  alert(r.ok ? ('Reset done: '+((j.removed||[]).join(', ')||'nothing to delete')) : ('Reset failed: '+(j.detail||r.status)));
-  setTimeout(()=>location.reload(), 1000);
-});
-</script></body></html>
-"""
-    return HTMLResponse(html)
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(f.read())
+    except Exception as e:
+        return HTMLResponse(f"<h1>UI Error</h1><p>Could not load index.html: {e}</p>", status_code=500)
 
 
 @app.get("/exports", response_class=HTMLResponse)
