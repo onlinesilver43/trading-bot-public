@@ -6,6 +6,9 @@ services:
     env_file:
       - ../.env
     environment:
+      GIT_BRANCH: ${GIT_BRANCH:-unknown}
+      DEPLOY_TAG: ${DEPLOY_TAG:-unknown}
+      GIT_SHA: ${GIT_SHA:-unknown}
       STRAT_PROFILE: "blended_1000_trendonly"
       EXCHANGE: "binanceus"
       SYMBOL: "BTC/USDT"
@@ -20,6 +23,9 @@ services:
     image: tb-app:latest
     command: ["bash","-lc","uvicorn ui:app --host 0.0.0.0 --port 8080"]
     environment:
+      GIT_BRANCH: ${GIT_BRANCH:-unknown}
+      DEPLOY_TAG: ${DEPLOY_TAG:-unknown}
+      GIT_SHA: ${GIT_SHA:-unknown}
       DATA_DIR: "/data"
       STATE_PATH: "/data/paper_state.json"
       TRADES_PATH: "/data/paper_trades.json"
