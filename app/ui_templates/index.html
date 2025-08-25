@@ -1,5 +1,2 @@
-<script>fetch("/api/meta").then(r=>r.json()).then(m=>{
-  const el=document.getElementById("buildmeta");
-  if(el){el.textContent = `Deployed: ${m.branch} @ ${m.deploy_tag} (${m.commit?.slice(0,7) || "???"})`; }
-}).catch(()=>{});</script>
+<script>fetch("/api/meta").then(r=>r.json()).then(m=>{const el=document.getElementById("buildmeta"); if(el){const short=(m.commit||"").slice(0,7); el.textContent=`Deployed: ${m.branch} @ ${m.deploy_tag} ${short?"(":""}${short}${short?")":""}`;}}).catch(()=>{});</script>
 </script></body></html>
