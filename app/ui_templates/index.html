@@ -133,11 +133,35 @@ th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;le
         <div class="label">Current</div>
         <div class="row"><div>Cash (USD)</div><div class="value">${usd(s.cash_usd)}</div></div>
         <div class="row"><div>Coin (units)</div><div class="value">${num(s.coin_units,6)}</div></div>
+        <div class="row"><div>Coins retained (stash)</div><div class="value"><span id="coinsRetained">—</span></div></div>
+        <div class="row"><div>Retains (total)</div><div class="value"><span id="retainsTotal">—</span></div></div>
         <div class="row"><div>Equity (USD)</div><div class="value">${usd(s.equity_usd)}</div></div>
         <div class="row"><div>Fees paid</div><div class="value">${usd(s.fees_paid_usd)}</div></div>
       </div>
     </div>`;
     document.getElementById('cards').innerHTML = cardsHTML;
+    // Fill new metrics after rendering
+    { // Coins retained (stash) from /api/state
+      const el = document.getElementById('coinsRetained');
+      if (el) el.textContent = num(s.stash_coin_units, 6);
+    }
+    { // Retains (total) via lightweight endpoint
+      try {
+        const r = await fetch('/api/retains_total', {cache:'no-store'});
+        if (r && r.ok) {
+          const j = await r.json();
+          const el = document.getElementById('retainsTotal');
+          if (el) el.textContent = (j && (j.retains_total ?? j.total)) ?? '—';
+        } else {
+          const el = document.getElementById('retainsTotal');
+          if (el) el.textContent = '—';
+        }
+      } catch(_) {
+        const el = document.getElementById('retainsTotal');
+        if (el) el.textContent = '—';
+      }
+    }
+
     // Fill new metrics
     { // Coins retained (stash) from /api/state
       const el = document.getElementById('coinsRetained');
@@ -157,171 +181,6 @@ th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;le
       }
     }
 
-
-    const body=document.querySelector('#trades tbody');
-    body.innerHTML=t.slice(-10).reverse().map(x=>`
-      <tr>
-        <td>${x.t||''}</td><td>${x.type||''}</td><td>${num(x.price,2)}</td><td>${num(x.units,6)}</td>
-        <td>${usd(x.fee_usd)}</td><td>${x.type==='sell'?usd(x.pnl):''}</td>
-        <td>${usd(x.cash_usd)}</td><td>${num(x.coin_units,6)}</td>
-      </tr>`).join('');
-  }
-  load(); setInterval(load,2000);
-
-  document.getElementById('btnReset').addEventListener('click', async ()=>{
-    if(!confirm('Hard reset paper data? This clears all JSON state/trades/exports.')) return;
-    const r = await fetch('/api/reset', {method:'POST'});
-    const j = await r.json().catch(()=>({}));
-    alert(r.ok ? ('Reset done: '+(j.removed||[]).join(', ') || 'nothing to delete') : ('Reset failed: '+(j.detail||r.status)));
-    setTimeout(()=>location.reload(), 1000);
-  });
-  </script>
-</body>
-</html>
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Trading Bots – Status</title>
-  <style>
-:root{--bg:#0b1020;--card:#141a2d;--text:#e8ecff;--muted:#9aa4c7;--accent:#6ea8fe;--warn:#ffb74d;--green:#41d1a7;--red:#ff6b6b}
-*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial}
-h1{margin:0 0 16px;font-size:28px}.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
-.label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}.value{font-weight:700;font-size:20px}
-.row{display:flex;justify-content:space-between;gap:12px;margin:8px 0}
-.btn{display:inline-block;padding:10px 14px;border-radius:10px;background:var(--accent);color:#081227;text-decoration:none;font-weight:700}
-.btn-warn{background:var(--warn);color:#081227}
-table{width:100%;border-collapse:collapse}th,td{padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);text-align:left}
-th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
-.pnl-pos{color:var(--green)}.pnl-neg{color:var(--red)}a{color:var(--accent)}.muted{color:var(--muted)}
-.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}
-.badge-ok{background:#153d2a;color:#41d1a7}.badge-warn{background:#3e2f14;color:#ffb74d}.badge-err{background:#3d1a1a;color:#ff6b6b}
-.small{font-size:12px}
-  </style>
-</head>
-<body>
-
-  <!-- Blue build banner filled by /api/meta -->
-  <div id="buildmeta" style="font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0b3d91;color:#fff;padding:6px 10px;">
-    Loading build info…
-  </div>
-
-  <h1>Trading Bots – Status <span class="muted" id="updated"></span></h1>
-
-  <div style="margin:0 0 16px; display:flex; gap:10px; flex-wrap:wrap;">
-    <a class="btn" href="/api/export.zip">Export Diagnostics (ZIP)</a>
-    <a class="btn" href="/api/source.zip">Export Source (ZIP)</a>
-    <a class="btn" href="/exports">Exports</a>
-    <button id="btnReset" class="btn btn-warn" title="Clears paper JSON files on the server.">Hard Reset (paper)</button>
-  </div>
-
-  <div id="cards"></div>
-
-  <div class="card" style="margin-top:16px;">
-    <div class="row"><div class="label">Recent Trades</div><div class="muted" id="tradeCount"></div></div>
-    <table id="trades"><thead>
-      <tr><th>Time (UTC)</th><th>Type</th><th>Price</th><th>Units</th><th>Fee</th><th>PnL</th><th>Cash</th><th>Coin</th></tr>
-    </thead><tbody></tbody></table>
-  </div>
-
-  <div style="margin:12px 0;"><a href="/api/state">/api/state</a></div>
-
-  <script>
-  // --- build banner
-  fetch("/api/meta").then(r=>r.ok?r.json():null).then(m=>{
-    const el=document.getElementById("buildmeta"); if(!el||!m) return;
-    const s=(m.commit||"").slice(0,7);
-    el.textContent=`Deployed: ${m.branch||"unknown"} @ ${m.deploy_tag||"unknown"}`+(s?` (${s})`:"");
-  }).catch(()=>{});
-
-  const $=(id)=>document.getElementById(id);
-  function usd(x){return x==null?"—":"$"+Number(x).toLocaleString(undefined,{maximumFractionDigits:2})}
-  function num(x,n=6){return x==null?"—":Number(x).toFixed(n).replace(/\.?0+$/,'')}
-  function pct(x,n=2){return x==null?"—":(Number(x)*100).toFixed(n).replace(/\.?0+$/,'')+'%'}
-
-  function heartbeat(tsStr){
-    if(!tsStr) return ["badge-err","stale"];
-    const now = Date.now();
-    const last = Date.parse(tsStr);
-    if(isNaN(last)) return ["badge-err","invalid time"];
-    const diff = (now - last)/1000;
-    if(diff <= 15) return ["badge-ok", "live"];
-    if(diff <= 90) return ["badge-warn", Math.round(diff)+"s behind"];
-    return ["badge-err", Math.round(diff/60)+"m behind"];
-  }
-
-  async function load(){
-    const [stateRes, cfgRes] = await Promise.all([
-      fetch('/api/state'), fetch('/exports/view/bot_config.json').catch(()=>null)
-    ]);
-    const data = await stateRes.json();
-    const s = (data && data.state) || {}, t = (data && data.trades) || [];
-    let cfg = null;
-    if(cfgRes && cfgRes.ok){
-      const txt = await cfgRes.text();
-      try{ cfg = JSON.parse(txt.replace(/^<pre[^>]*>/,'').replace(/<\/pre>$/,'')); }catch(e){ cfg=null; }
-    }
-
-    $('updated').textContent='• '+(s.updated_at||'—');
-    $('tradeCount').textContent=`${t.length} total`;
-
-    const [hbClass, hbText] = heartbeat(s.updated_at);
-
-    const symbol = s.symbol || (cfg && cfg.symbol) || '—';
-    const timeframe = (cfg && cfg.timeframe) || '—';
-    const position = s.position || '—';
-    const entry = s.entry_price!=null ? ` @ ${num(s.entry_price,2)}` : '';
-    const unreal = s.unrealized_pnl_usd;
-    const equity = s.equity_usd;
-
-    const cfgRows = cfg ? `
-      <div class="row"><div class="label">Pair / TF</div><div class="value">${cfg.symbol||'—'} / ${cfg.timeframe||'—'}</div></div>
-      <div class="row"><div>FAST / SLOW</div><div class="value">${cfg.fast_sma_len} / ${cfg.slow_sma_len}</div></div>
-      <div class="row"><div>Confirm bars</div><div class="value">${cfg.confirm_bars}</div></div>
-      <div class="row"><div>Min hold bars</div><div class="value">${cfg.min_hold_bars}</div></div>
-      <div class="row"><div>Threshold</div><div class="value">${pct(cfg.hysteresis_bp?cfg.hysteresis_bp/10000:cfg.threshold_pct)}</div></div>
-      <div class="row"><div>Order sizing</div><div class="value">${cfg.order_pct_equity!=null? (pct(cfg.order_pct_equity)+' of equity'):('$'+(cfg.order_size_usd||'—'))}</div></div>
-    ` : `<div class="small">No bot_config.json yet.</div>`;
-
-    const cardsHTML = `
-    <div class="grid">
-      <div class="card">
-        <div class="row"><div class="label">Bot Summary</div><div class="badge ${hbClass}">${hbText}</div></div>
-        <div class="row"><div>Symbol</div><div class="value">${symbol}</div></div>
-        <div class="row"><div>Timeframe</div><div class="value">${timeframe}</div></div>
-        <div class="row"><div>Position</div><div class="value">${position}${entry}</div></div>
-        <div class="row"><div>Last price</div><div class="value">${num(s.last_price,2)}</div></div>
-          <div class="kv"><b>Coins retained (stash)</b><span id="coinsRetained">—</span></div>
-          <div class="kv"><b>Retains (total)</b><span id="retainsTotal">—</span></div>
-        <div class="row"><div>Equity (USD)</div><div class="value">${usd(equity)}</div></div>
-        <div class="row"><div>Unrealized PnL</div><div class="value ${(unreal||0)>=0?'pnl-pos':'pnl-neg'}">${usd(unreal)}</div></div>
-        <div class="row"><div>Action/Skip</div><div class="value small">${(s.last_action||'—') + (s.skip_reason?` / ${s.skip_reason}`:'')}</div></div>
-      </div>
-
-      <div class="card">
-        <div class="row"><div class="label">Config Snapshot</div><div class="muted small">${cfg && cfg.updated_at ? cfg.updated_at : ''}</div></div>
-        ${cfgRows}
-      </div>
-
-      <div class="card">
-        <div class="label">Starting</div>
-        <div class="row"><div>Cash (USD)</div><div class="value">${usd(s.start_cash_usd)}</div></div>
-        <div class="row"><div>Coin (units)</div><div class="value">${num(s.start_coin_units,6)}</div></div>
-      </div>
-
-      <div class="card">
-        <div class="label">Current</div>
-        <div class="row"><div>Cash (USD)</div><div class="value">${usd(s.cash_usd)}</div></div>
-        <div class="row"><div>Coin (units)</div><div class="value">${num(s.coin_units,6)}</div></div>
-          <div class="kv"><b>Coins retained (stash)</b><span id="coinsRetained">—</span></div>
-          <div class="kv"><b>Retains (total)</b><span id="retainsTotal">—</span></div>
-        <div class="row"><div>Equity (USD)</div><div class="value">${usd(s.equity_usd)}</div></div>
-        <div class="row"><div>Fees paid</div><div class="value">${usd(s.fees_paid_usd)}</div></div>
-      </div>
-    </div>`;
-    document.getElementById('cards').innerHTML = cardsHTML;
 
     const body=document.querySelector('#trades tbody');
     body.innerHTML=t.slice(-10).reverse().map(x=>`
