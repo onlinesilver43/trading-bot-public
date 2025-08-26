@@ -113,6 +113,8 @@ th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;le
         <div class="row"><div>Timeframe</div><div class="value">${timeframe}</div></div>
         <div class="row"><div>Position</div><div class="value">${position}${entry}</div></div>
         <div class="row"><div>Last price</div><div class="value">${num(s.last_price,2)}</div></div>
+          <div class="kv"><b>Coins retained (stash)</b><span id="coinsRetained">—</span></div>
+          <div class="kv"><b>Retains (total)</b><span id="retainsTotal">—</span></div>
         <div class="row"><div>Equity (USD)</div><div class="value">${usd(equity)}</div></div>
         <div class="row"><div>Unrealized PnL</div><div class="value ${(unreal||0)>=0?'pnl-pos':'pnl-neg'}">${usd(unreal)}</div></div>
         <div class="row"><div>Action/Skip</div><div class="value small">${(s.last_action||'—') + (s.skip_reason?` / ${s.skip_reason}`:'')}</div></div>
@@ -133,6 +135,8 @@ th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;le
         <div class="label">Current</div>
         <div class="row"><div>Cash (USD)</div><div class="value">${usd(s.cash_usd)}</div></div>
         <div class="row"><div>Coin (units)</div><div class="value">${num(s.coin_units,6)}</div></div>
+          <div class="kv"><b>Coins retained (stash)</b><span id="coinsRetained">—</span></div>
+          <div class="kv"><b>Retains (total)</b><span id="retainsTotal">—</span></div>
         <div class="row"><div>Equity (USD)</div><div class="value">${usd(s.equity_usd)}</div></div>
         <div class="row"><div>Fees paid</div><div class="value">${usd(s.fees_paid_usd)}</div></div>
       </div>
