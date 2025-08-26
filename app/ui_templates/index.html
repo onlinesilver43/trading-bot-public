@@ -133,11 +133,67 @@ th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;le
         <div class="label">Current</div>
         <div class="row"><div>Cash (USD)</div><div class="value">${usd(s.cash_usd)}</div></div>
         <div class="row"><div>Coin (units)</div><div class="value">${num(s.coin_units,6)}</div></div>
+        <div class="row"><div>Coins retained (stash)</div><div class="value"><span id="coinsRetained">—</span></div></div>
+        <div class="row"><div>Retains (total)</div><div class="value"><span id="retainsTotal">—</span></div></div>
         <div class="row"><div>Equity (USD)</div><div class="value">${usd(s.equity_usd)}</div></div>
         <div class="row"><div>Fees paid</div><div class="value">${usd(s.fees_paid_usd)}</div></div>
       </div>
     </div>`;
     document.getElementById('cards').innerHTML = cardsHTML;
+    // Fill retains/stash after render (safe if spans are missing)
+    { const el = document.getElementById('coinsRetained'); if (el) el.textContent = num(s.stash_coin_units, 6); }
+    { try {
+        const r = await fetch('/api/retains_total', {cache:'no-store'});
+        const j = r && r.ok ? (await r.json()) : null;
+        const el = document.getElementById('retainsTotal');
+        if (el) el.textContent = (j && (j.retains_total ?? j.total)) ?? '—';
+      } catch(e) {
+        const el = document.getElementById('retainsTotal');
+        if (el) el.textContent = '—';
+      }
+    }
+
+    // Fill new metrics after rendering
+    { // Coins retained (stash) from /api/state
+      const el = document.getElementById('coinsRetained');
+      if (el) el.textContent = num(s.stash_coin_units, 6);
+    }
+    { // Retains (total) via lightweight endpoint
+      try {
+        const r = await fetch('/api/retains_total', {cache:'no-store'});
+        if (r && r.ok) {
+          const j = await r.json();
+          const el = document.getElementById('retainsTotal');
+          if (el) el.textContent = (j && (j.retains_total ?? j.total)) ?? '—';
+        } else {
+          const el = document.getElementById('retainsTotal');
+          if (el) el.textContent = '—';
+        }
+      } catch(_) {
+        const el = document.getElementById('retainsTotal');
+        if (el) el.textContent = '—';
+      }
+    }
+
+    // Fill new metrics
+    { // Coins retained (stash) from /api/state
+      const el = document.getElementById('coinsRetained');
+      if (el) el.textContent = num(s.stash_coin_units, 6);
+    }
+    { // Retains (total) via lightweight endpoint
+      try {
+        const r = await fetch('/api/retains_total', {cache:'no-store'});
+        if (r.ok) {
+          const j = await r.json();
+          const el = document.getElementById('retainsTotal');
+          if (el) el.textContent = (j && (j.retains_total ?? j.total)) ?? '—';
+        }
+      } catch(_) {
+        const el = document.getElementById('retainsTotal');
+        if (el) el.textContent = '—';
+      }
+    }
+
 
     const body=document.querySelector('#trades tbody');
     body.innerHTML=t.slice(-10).reverse().map(x=>`

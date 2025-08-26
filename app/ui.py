@@ -140,3 +140,27 @@ router_meta = APIRouter()
 def api_meta():
     return get_build_meta()
 app.include_router(router_meta)
+
+@app.get("/api/retains_total")
+def api_retains_total():
+    import os, json
+    path = os.getenv("TRADES_PATH", "/data/paper_trades.json")
+    total = 0
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            arr = json.load(f)
+        for t in (arr or []):
+            t = t or {}
+            ty = str(t.get("type","")).lower()
+            r_flag = bool(t.get("retain_to_stash") or t.get("retain"))
+            r_pct  = float(t.get("retain_pct", 0) or 0)
+            r_usd  = float(t.get("retain_usd", 0) or 0)
+            r_coin = float(t.get("retain_coin_units", 0) or 0)
+            r_stash= float(t.get("stash_delta", 0) or 0)
+            if ty in ("retain","retain_to_stash"):
+                total += 1
+            elif ty == "sell" and (r_flag or r_pct>0 or r_usd>0 or r_coin>0 or r_stash>0):
+                total += 1
+    except Exception:
+        total = 0
+    return {"retains_total": int(total)}
