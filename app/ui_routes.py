@@ -123,3 +123,30 @@ except Exception:
 @router.get("/api/meta")
 def api_meta():
     return get_build_meta()
+
+# --- additive endpoint: /api/retains_total (no breaking changes) ---
+try:
+    from fastapi import APIRouter
+except Exception:
+    from fastapi import APIRouter
+try:
+    router
+except NameError:
+    router = APIRouter()
+
+@router.get("/api/retains_total")
+def get_retains_total():
+    import os, json
+    p = os.getenv("TRADES_PATH", "/data/paper_trades.json")
+    n = 0
+    try:
+        with open(p, "r") as f:
+            data = json.load(f)
+        for t in (data or []):
+            ty = str((t or {}).get("type", "")).lower()
+            if ty in ("retain", "retain_to_stash"):
+                n += 1
+    except Exception:
+        # If file missing/corrupt, return 0 gracefully
+        n = 0
+    return {"retains_total": n}
