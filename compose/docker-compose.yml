@@ -6,9 +6,6 @@ services:
     env_file:
       - ../.env
     environment:
-      GIT_BRANCH: ${GIT_BRANCH:-unknown}
-      DEPLOY_TAG: ${DEPLOY_TAG:-unknown}
-      GIT_SHA: ${GIT_SHA:-unknown}
       STRAT_PROFILE: "blended_1000_trendonly"
       EXCHANGE: "binanceus"
       SYMBOL: "BTC/USDT"
@@ -31,9 +28,6 @@ services:
       HOST_APP: "/host_app"
       HOST_COMPOSE: "/host_compose"
       HOST_GITHUB: "/host_github"
-      GIT_BRANCH: ${GIT_BRANCH:-unknown}
-      DEPLOY_TAG: ${DEPLOY_TAG:-unknown}
-      GIT_SHA: ${GIT_SHA:-unknown}
     volumes:
       - /srv/trading-bots/data:/data
       - /srv/trading-bots/app:/host_app:ro
