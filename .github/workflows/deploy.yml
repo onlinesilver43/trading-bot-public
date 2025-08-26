@@ -1,4 +1,6 @@
 name: Deploy to Droplet
+
+
 on:
   push:
     branches: [ main ]
@@ -44,6 +46,11 @@ jobs:
             : > /srv/trading-bots/.env
             printf "BINANCE_API_KEY=%s\n" "${{ secrets.BINANCE_API_KEY }}"   >> /srv/trading-bots/.env
             printf "BINANCE_API_SECRET=%s\n" "${{ secrets.BINANCE_API_SECRET }}" >> /srv/trading-bots/.env
+            
+            # build meta for UI banner (/api/meta)
+            echo "GIT_BRANCH=${{ github.ref_name }}" >> /srv/trading-bots/.env
+            echo "DEPLOY_TAG=${{ github.ref_name }}" >> /srv/trading-bots/.env
+            echo "GIT_SHA=${{ github.sha }}"         >> /srv/trading-bots/.env
 
             # rebuild & restart
             docker compose -p tb -f /srv/trading-bots/compose/docker-compose.yml down --remove-orphans 

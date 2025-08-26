@@ -109,3 +109,17 @@ def api_reset():
             except Exception as e:
                 raise HTTPException(500, f"Failed to remove {fn}: {e}")
     return JSONResponse({"status":"ok","removed":removed})
+
+# --- build meta router (created) ---
+from fastapi import APIRouter
+router = APIRouter()
+
+try:
+    from build_meta import get_build_meta
+except Exception:
+    def get_build_meta():
+        return {"branch":"unknown","deploy_tag":"unknown","commit":"unknown","image":"","updated_at":""}
+
+@router.get("/api/meta")
+def api_meta():
+    return get_build_meta()

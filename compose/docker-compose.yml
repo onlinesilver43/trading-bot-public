@@ -6,7 +6,7 @@ services:
     env_file:
       - ../.env
     environment:
-      STRAT_PROFILE: "blended_1000"
+      STRAT_PROFILE: "blended_1000_trendonly"
       EXCHANGE: "binanceus"
       SYMBOL: "BTC/USDT"
       STATE_PATH: "/data/paper_state.json"
@@ -19,6 +19,8 @@ services:
     build: ../app
     image: tb-app:latest
     command: ["bash","-lc","uvicorn ui:app --host 0.0.0.0 --port 8080"]
+    env_file:
+      - ../.env              # << add this line
     environment:
       DATA_DIR: "/data"
       STATE_PATH: "/data/paper_state.json"
