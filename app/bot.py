@@ -258,8 +258,32 @@ def main():
                 ensure_expected_files_exist(state)
                 append_json_array(CANDLES_WITH_SIGNALS_PATH, {
                     "ts": iso(last_ts), "o": o[-1], "h": h[-1], "l": l[-1], "c": c[-1], "v": v[-1],
-                    "fast": fast[-1], "slow": slow[-1], "signal": "hold"
+                    "fast": fast[-1], "slow": slow[-1],
+                    "signal": "hold"
                 })
+            
+                # NEW: mirror active config even on hysteresis skip so UI stays in sync
+                botcfg = {
+                    "symbol": SYMBOL, "timeframe": TIMEFRAME,
+                    "fast_sma_len": CFG["FAST"], "slow_sma_len": CFG["SLOW"],
+                    "confirm_bars": CFG["CONFIRM_BARS"], "min_hold_bars": CFG["MIN_HOLD_BARS"],
+                    "hysteresis_bp": round(CFG["THRESHOLD_PCT"]*10000, 4),
+                    "order_size_usd": CFG["ORDER_SIZE_USD"],
+                    "order_pct_equity": CFG["ORDER_PCT_EQUITY"],
+                    "maker_fee_bp": CFG["FEE_RATE"]*10000, "taker_fee_bp": CFG["FEE_RATE"]*10000,
+                    "assumed_slippage_bp": CFG["SLIPPAGE_BP"], "min_notional_usd": 1.0,
+                    "tick_size": 0.01, "step_size": 1e-5,
+                    "stack_floor_usd": CFG["STACK_FLOOR_USD"],
+                    "retain_pct_up": CFG["RETAIN_PCT_UP"], "retain_pct_chop": CFG["RETAIN_PCT_CHOP"], "retain_pct_down": CFG["RETAIN_PCT_DOWN"],
+                    "cash_floor_pct": CFG["CASH_FLOOR_PCT"],
+                    "rebalance_days": CFG["REBALANCE_DAYS"],
+                    "rebalance_max_stash_pct": CFG["REBALANCE_MAX_STASH_PCT"],
+                    "rebalance_target_stash_pct": CFG["REBALANCE_TARGET_STASH_PCT"],
+                    "profile": CFG.get("PROFILE"),
+                    "updated_at": iso(last_ts)
+                }
+                atomic_write_json(BOTCFG_PATH, botcfg)
+            
                 sleep_until_next_close(tfms, last_ts); continue
 
             # optional trend slope guard
