@@ -377,12 +377,15 @@ def main():
                     candidate = qty * retain_pct
                     if candidate*fill_price >= CFG["MIN_RETAIN_USD"]:
                         retain_units = min(candidate, qty)
-
-                sell_units = max(0.0, qty - retain_units)
-                state["trade_coin_units"] -= sell_units
-                state["stash_coin_units"] += retain_units
-                state["cash_usd"] += (sell_units*fill_price - fee)
-                state["fees_paid_usd"] += fee
+                        # execute sell of the rest
+                        sell_units = max(0.0, qty - retain_units)
+                        sell_units = round(sell_units, 12)
+                        retain_units = round(retain_units, 12)
+                        # zero out trade bucket; stash only the retained portion
+                        state["trade_coin_units"] = 0.0
+                        state["stash_coin_units"] += retain_units
+                        state["cash_usd"] += (sell_units * fill_price - fee)
+                        state["fees_paid_usd"] += fee
 
                 # skim a portion of profit to cash if profitable
                 if realized_pnl > 0 and CFG["SKIM_PROFIT_PCT"] > 0:
