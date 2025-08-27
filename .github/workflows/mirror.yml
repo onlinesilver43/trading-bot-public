@@ -1,24 +1,40 @@
 name: Mirror to Public
+
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: {}
+    tags:
+      - 'deploy-*'
+  workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout full history
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false   # don't use GITHUB_TOKEN
-      - name: Configure git remote to public mirror (with PAT)
+
+      - name: Sanity: ensure secrets exist
         run: |
-          git config user.name "mirror-bot"
-          git config user.email "mirror-bot@users.noreply.github.com"
-          git remote remove public 2>/dev/null || true
-          git remote add public "https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/${{ github.repository_owner }}/trading-bot-public.git"
-          git config --global http.https://github.com/.extraheader ""  # ensure no GITHUB_TOKEN header
-      - name: Push to mirror
-        run: git push --force --prune public HEAD:main
+          test -n "${{ secrets.MIRROR_PAT }}" || { echo "MIRROR_PAT missing"; exit 1; }
+          test -n "${{ secrets.MIRROR_REPO }}" || { echo "MIRROR_REPO missing"; exit 1; }
+
+      - name: Add public remote
+        run: |
+          git remote add public https://x-access-token:${{ secrets.MIRROR_PAT }}@github.com/${{ secrets.MIRROR_REPO }}.git
+          git remote -v
+
+      - name: Mirror main → main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git push public refs/heads/main:refs/heads/main --force-with-lease
+
+      - name: Mirror deploy tag
+        if: startsWith(github.ref, 'refs/tags/deploy-')
+        run: |
+          git push public $GITHUB_REF:$GITHUB_REF --force-with-lease
