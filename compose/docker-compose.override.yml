@@ -1,0 +1,7 @@
+services:
+  bot:
+    environment:
+      STRAT_PROFILE: btc_5m_guarded_momo_trendassist
+  ui:
+    environment:
+      STRAT_PROFILE: btc_5m_guarded_momo_trendassist
