@@ -1,0 +1,50 @@
+name: Mirror Auth Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      write_test:
+        description: "Also test write access by pushing a temp branch (will create & delete _mirror_write_test)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  auth:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (shallow is fine)
+        uses: actions/checkout@v4
+
+      - name: Verify required secrets
+        if: ${{ secrets.MIRROR_PAT == '' || secrets.MIRROR_REPO == '' }}
+        run: |
+          echo "Required secrets MIRROR_PAT and MIRROR_REPO must be set" >&2
+          exit 1
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "mirror-bot"
+          git config user.email "mirror-bot@users.noreply.github.com"
+
+      - name: Add/refresh public remote (using PAT)
+        run: |
+          git remote remove public 2>/dev/null || true
+          git remote add public "https://x-access-token:${{ secrets.MIRROR_PAT }}@github.com/${{ secrets.MIRROR_REPO }}.git"
+          git remote -v
+
+      - name: Probe READ auth (ls-remote)
+        run: |
+          echo "Listing heads from public (should succeed):"
+          git ls-remote --heads public
+
+      - name: Probe WRITE auth (create & delete temp branch)
+        if: ${{ inputs.write_test }}
+        run: |
+          echo "Pushing temp branch to test write access…"
+          git push public HEAD:refs/heads/_mirror_write_test --force
+          echo "Deleting temp branch…"
+          git push public :refs/heads/_mirror_write_test
