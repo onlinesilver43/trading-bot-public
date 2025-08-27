@@ -6,9 +6,6 @@ services:
     env_file:
       - ../.env
     environment:
-      RETAIN_PCT_CHOP: "0.02"
-      THRESHOLD_PCT: "0.0038"
-      MIN_HOLD_BARS: "7"
       STRAT_PROFILE: "btc_5m_guarded_momo_trendassist"
       EXCHANGE: "binanceus"
       SYMBOL: "BTC/USDT"
