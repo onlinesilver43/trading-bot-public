@@ -51,63 +51,14 @@ def load_profile() -> Dict[str, Any]:
         path = os.path.join(profile_dir, f"{name}.json")
         with open(path, "r", encoding="utf-8") as f:
             profile = json.load(f)
+    # Profile is the source of truth; allow opt-in env override with ALLOW_ENV_OVERRIDE=1
+    ALLOW_ENV = os.environ.get("ALLOW_ENV_OVERRIDE", "0") == "1"
 
     def pick(key, env=None, default=None, co=float):
-        if env and env in os.environ:
+        if ALLOW_ENV and env and env in os.environ:
             return co(os.environ[env]) if co else os.environ[env]
         if key in profile: return profile[key]
         return default
-
-    cfg = {
-        # market + timeframe
-        "EXCHANGE": pick("EXCHANGE","EXCHANGE","binanceus",str),
-        "SYMBOL": pick("SYMBOL","SYMBOL","BTC/USDT",str),
-        "TIMEFRAME": pick("TIMEFRAME","TIMEFRAME","1m",str),
-
-        # SMA cross + discipline
-        "FAST": int(pick("FAST","FAST",7)),
-        "SLOW": int(pick("SLOW","SLOW",25)),
-        "CONFIRM_BARS": int(pick("CONFIRM_BARS","CONFIRM_BARS",1)),
-        "MIN_HOLD_BARS": int(pick("MIN_HOLD_BARS","MIN_HOLD_BARS",2)),
-        "THRESHOLD_PCT": float(pick("THRESHOLD_PCT","THRESHOLD_PCT",0.0003)),
-
-        # costs + friction
-        "FEE_RATE": float(pick("FEE_RATE","FEE_RATE",0.001)),
-        "SLIPPAGE_BP": float(pick("SLIPPAGE_BP","SLIPPAGE_BP",5)),
-        "COST_BUFFER_BP": float(pick("COST_BUFFER_BP","COST_BUFFER_BP",0)),
-
-        # sizing
-        "START_CASH_USD": float(pick("START_CASH_USD","START_CASH_USD",200)),
-        "ORDER_PCT_EQUITY": (None if os.environ.get("ORDER_PCT_EQUITY") in (None,"","null") else float(os.environ.get("ORDER_PCT_EQUITY")) ) if "ORDER_PCT_EQUITY" in os.environ else (profile.get("ORDER_PCT_EQUITY")),
-        "ORDER_SIZE_USD": float(pick("ORDER_SIZE_USD","ORDER_SIZE_USD",20)),
-        "MIN_TRADE_USD": float(pick("MIN_TRADE_USD","MIN_TRADE_USD",5)),
-        "STACK_FLOOR_USD": float(pick("STACK_FLOOR_USD","STACK_FLOOR_USD",0)),
-
-        # retain policy
-        "RETAIN_PCT_UP": float(profile.get("RETAIN_PCT_UP",0.10)),
-        "RETAIN_PCT_CHOP": float(profile.get("RETAIN_PCT_CHOP",0.03)),
-        "RETAIN_PCT_DOWN": float(profile.get("RETAIN_PCT_DOWN",0.0)),
-        "CASH_FLOOR_PCT": float(profile.get("CASH_FLOOR_PCT",0.40)),
-
-        # NEW knobs (fast upgrade)
-        "RETAIN_DISABLE_CASH_PCT": float(profile.get("RETAIN_DISABLE_CASH_PCT",0.45)),
-        "MIN_RETAIN_USD": float(profile.get("MIN_RETAIN_USD",5.0)),
-        "SKIM_PROFIT_PCT": float(profile.get("SKIM_PROFIT_PCT",0.10)),
-        "IDLE_CASH_APR": float(profile.get("IDLE_CASH_APR",0.05)),
-
-        # trend slope guard (optional)
-        "TREND_SLOPE_BARS": int(profile.get("TREND_SLOPE_BARS",20)),
-        "SLOPE_MIN_PCT_PER_BAR": float(profile.get("SLOPE_MIN_PCT_PER_BAR",0.0)),
-
-        # rebalance
-        "REBALANCE_DAYS": int(profile.get("REBALANCE_DAYS",30)),
-        "REBALANCE_MAX_STASH_PCT": float(profile.get("REBALANCE_MAX_STASH_PCT",0.70)),
-        "REBALANCE_TARGET_STASH_PCT": float(profile.get("REBALANCE_TARGET_STASH_PCT",0.60)),
-        "PROFILE": name or None,
-    }
-    return cfg
-
-CFG = load_profile()
 
 # ---------- Exchange ----------
 def get_exchange():
