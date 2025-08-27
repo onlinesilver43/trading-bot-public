@@ -41,7 +41,6 @@ def ensure_expected_files_exist(state: Dict[str, Any]):
 
 # ---------- Profile loading ----------
 def load_profile() -> Dict[str, Any]:
-CFG = load_profile()
 
 def get_exchange():
     ex = CFG["EXCHANGE"]
@@ -118,6 +117,11 @@ TIMEFRAME = CFG["TIMEFRAME"]
         "PROFILE": name or None,
     }
     return cfg
+# instantiate configuration once at module load
+CFG = load_profile()
+
+
+
 # ---------- Exchange ----------def tf_ms(tf: str) -> int:
     unit = tf[-1]; n = int(tf[:-1])
     mult = {"s":1000,"m":60000,"h":3600000,"d":86400000}[unit]
