@@ -5,9 +5,9 @@ on:
     inputs:
       write_test:
         description: "Also test write access by pushing a temp branch (creates & deletes _mirror_write_test)"
-        required: false
+        required: true
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -16,8 +16,11 @@ jobs:
   auth:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout (no credentials)
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # <<< prevent GITHUB_TOKEN from adding its own header
+          fetch-depth: 0
 
       - name: Verify required secrets
         env:
@@ -36,11 +39,13 @@ jobs:
           git config user.name  "mirror-bot"
           git config user.email "mirror-bot@users.noreply.github.com"
 
-      # Use HTTP Authorization header so pushes never fall back to github-actions[bot]
-      - name: Configure HTTP auth header for github.com
+      # Remove any leftover headers from previous steps, then set ours
+      - name: Configure HTTP auth header (PAT)
         env:
           MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
         run: |
+          git config --global --unset-all http.https://github.com/.extraheader || true
+          git config --global --unset-all http.https://api.github.com/.extraheader || true
           header=$(printf "x-access-token:%s" "${MIRROR_PAT}" | base64 -w0 2>/dev/null || printf "x-access-token:%s" "${MIRROR_PAT}" | base64)
           git config --global http.https://github.com/.extraheader "AUTHORIZATION: basic ${header}"
           git config --global http.https://api.github.com/.extraheader "AUTHORIZATION: basic ${header}"
