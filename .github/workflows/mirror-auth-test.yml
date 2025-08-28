@@ -36,28 +36,34 @@ jobs:
           git config user.name  "mirror-bot"
           git config user.email "mirror-bot@users.noreply.github.com"
 
-      - name: Read probe using PAT URL
+      # Use HTTP Authorization header so pushes never fall back to github-actions[bot]
+      - name: Configure HTTP auth header for github.com
         env:
           MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
+        run: |
+          header=$(printf "x-access-token:%s" "${MIRROR_PAT}" | base64 -w0 2>/dev/null || printf "x-access-token:%s" "${MIRROR_PAT}" | base64)
+          git config --global http.https://github.com/.extraheader "AUTHORIZATION: basic ${header}"
+          git config --global http.https://api.github.com/.extraheader "AUTHORIZATION: basic ${header}"
+
+      - name: Read probe (ls-remote)
+        env:
           MIRROR_REPO: ${{ secrets.MIRROR_REPO }}
         run: |
           echo "Listing heads from public (should succeed):"
-          git ls-remote --heads "https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}.git"
+          git ls-remote --heads "https://github.com/${MIRROR_REPO}.git"
 
       - name: Write probe create temp branch
         if: ${{ inputs.write_test }}
         env:
-          MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
           MIRROR_REPO: ${{ secrets.MIRROR_REPO }}
         run: |
           echo "Pushing temp branch to test write access..."
-          git push "https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}.git" HEAD:refs/heads/_mirror_write_test --force
+          git push "https://github.com/${MIRROR_REPO}.git" HEAD:refs/heads/_mirror_write_test --force
 
       - name: Write probe delete temp branch
         if: ${{ inputs.write_test }}
         env:
-          MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
           MIRROR_REPO: ${{ secrets.MIRROR_REPO }}
         run: |
           echo "Deleting temp branch..."
-          git push "https://x-access-token:${MIRROR_PAT}@github.com/${MIRROR_REPO}.git" :refs/heads/_mirror_write_test
+          git push "https://github.com/${MIRROR_REPO}.git" :refs/heads/_mirror_write_test
