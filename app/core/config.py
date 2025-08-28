@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 
+
 @dataclass
 class Config:
     exchange: str = os.getenv("EXCHANGE", "binanceus")
@@ -26,14 +27,22 @@ class Config:
     @property
     def data_dir(self) -> str:
         import os
+
         return os.path.dirname(self.state_path) or "/data"
 
     # derived export files
     @property
-    def f_trades_det(self): return f"{self.data_dir}/trades_detailed.json"
+    def f_trades_det(self):
+        return f"{self.data_dir}/trades_detailed.json"
+
     @property
-    def f_candles(self):    return f"{self.data_dir}/candles_with_signals.json"
+    def f_candles(self):
+        return f"{self.data_dir}/candles_with_signals.json"
+
     @property
-    def f_config(self):     return f"{self.data_dir}/bot_config.json"
+    def f_config(self):
+        return f"{self.data_dir}/bot_config.json"
+
     @property
-    def f_snap(self):       return f"{self.data_dir}/state_snapshots.json"
+    def f_snap(self):
+        return f"{self.data_dir}/state_snapshots.json"

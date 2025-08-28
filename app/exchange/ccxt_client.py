@@ -1,5 +1,6 @@
 import ccxt
 
+
 class Client:
     def __init__(self, exchange_name: str, api_key=None, api_secret=None):
         params = {"enableRateLimit": True}
@@ -7,7 +8,7 @@ class Client:
             params.update({"apiKey": api_key, "secret": api_secret})
         self.ccxt = getattr(ccxt, exchange_name)(params)
 
-    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int=200):
+    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 200):
         return self.ccxt.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
 
     def load_markets(self):

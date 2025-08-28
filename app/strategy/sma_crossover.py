@@ -1,5 +1,6 @@
 from app.core.utils import sma_series
 
+
 def indicators(closes, fast: int, slow: int, closed_only: bool = True):
     """
     Compute SMAs on CLOSED bars only (drop the last potentially-forming bar).
@@ -11,7 +12,16 @@ def indicators(closes, fast: int, slow: int, closed_only: bool = True):
     s = sma_series(seq, slow)
     return f, s
 
-def decide(fast_series, slow_series, last_price: float, cfg, last_trade_bar_ts: int, bar_ts: int, tf_ms: int):
+
+def decide(
+    fast_series,
+    slow_series,
+    last_price: float,
+    cfg,
+    last_trade_bar_ts: int,
+    bar_ts: int,
+    tf_ms: int,
+):
     """
     Decision on the LAST CLOSED bar:
       - CONFIRM_BARS: last N CLOSED bars satisfy direction (fast>slow for buy, fast<slow for sell)
@@ -25,15 +35,17 @@ def decide(fast_series, slow_series, last_price: float, cfg, last_trade_bar_ts: 
 
     def ok_dir(series_fast, series_slow, n, comp):
         n = min(n, k)
-        return all(comp(series_fast[-i], series_slow[-i]) for i in range(1, n+1))
+        return all(comp(series_fast[-i], series_slow[-i]) for i in range(1, n + 1))
 
-    buy_conf  = ok_dir(fast_series, slow_series, cfg.confirm_bars, lambda a,b: a > b)
-    sell_conf = ok_dir(fast_series, slow_series, cfg.confirm_bars, lambda a,b: a < b)
+    buy_conf = ok_dir(fast_series, slow_series, cfg.confirm_bars, lambda a, b: a > b)
+    sell_conf = ok_dir(fast_series, slow_series, cfg.confirm_bars, lambda a, b: a < b)
 
     sep = abs(fast_series[-1] - slow_series[-1]) / max(1e-12, last_price)
     threshold_ok = sep >= cfg.threshold_pct
 
-    bars_since = (bar_ts - int(last_trade_bar_ts)) / tf_ms if last_trade_bar_ts else 10**9
+    bars_since = (
+        (bar_ts - int(last_trade_bar_ts)) / tf_ms if last_trade_bar_ts else 10**9
+    )
     cooldown_ok = bars_since >= cfg.min_hold_bars
 
     signal, reason = "none", ""
