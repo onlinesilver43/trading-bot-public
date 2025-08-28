@@ -41,6 +41,15 @@ jobs:
           echo "Listing heads from public (should succeed):"
           git ls-remote --heads "https://x-access-token:${{ secrets.MIRROR_PAT }}@github.com/${{ secrets.MIRROR_REPO }}.git"
 
+      - name: Debug secrets length
+        run: |
+          echo "MIRROR_PAT length: ${#MIRROR_PAT}"
+          echo "MIRROR_REPO: $MIRROR_REPO"
+        env:
+          MIRROR_PAT: ${{ secrets.MIRROR_PAT }}
+          MIRROR_REPO: ${{ secrets.MIRROR_REPO }}
+
+
       - name: Write probe create temp branch
         if: ${{ inputs.write_test }}
         run: |
