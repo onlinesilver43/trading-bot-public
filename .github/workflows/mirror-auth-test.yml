@@ -5,9 +5,9 @@ on:
     inputs:
       write_test:
         description: "Also test write access by pushing a temp branch (creates & deletes _mirror_write_test)"
-        required: true
+        required: false
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
