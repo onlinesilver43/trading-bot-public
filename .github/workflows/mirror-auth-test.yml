@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       write_test:
-        description: "Also test write access by pushing a temp branch (will create & delete _mirror_write_test)"
+        description: "Also test write access by pushing a temp branch (creates & deletes _mirror_write_test)"
         required: false
         type: boolean
         default: false
@@ -16,7 +16,7 @@ jobs:
   auth:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (shallow is fine)
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Verify required secrets
@@ -36,21 +36,19 @@ jobs:
           git config user.name  "mirror-bot"
           git config user.email "mirror-bot@users.noreply.github.com"
 
-      - name: Add/refresh public remote (using PAT)
-        run: |
-          git remote remove public 2>/dev/null || true
-          git remote add public "https://x-access-token:${{ secrets.MIRROR_PAT }}@github.com/${{ secrets.MIRROR_REPO }}.git"
-          git remote -v
-
-      - name: Probe READ auth (ls-remote)
+      - name: Read probe using PAT URL
         run: |
           echo "Listing heads from public (should succeed):"
-          git ls-remote --heads public
+          git ls-remote --heads "https://x-access-token:${{ secrets.MIRROR_PAT }}@github.com/${{ secrets.MIRROR_REPO }}.git"
 
-      - name: Probe WRITE auth (create & delete temp branch)
+      - name: Write probe create temp branch
         if: ${{ inputs.write_test }}
         run: |
-          echo "Pushing temp branch to test write access…"
-          git push public HEAD:refs/heads/_mirror_write_test --force
-          echo "Deleting temp branch…"
-          git push public :refs/heads/_mirror_write_test
+          echo "Pushing temp branch to test write access..."
+          git push "https://x-access-token:${{ secrets.MIRROR_PAT }}@github.com/${{ secrets.MIRROR_REPO }}.git" HEAD:refs/heads/_mirror_write_test --force
+
+      - name: Write probe delete temp branch
+        if: ${{ inputs.write_test }}
+        run: |
+          echo "Deleting temp branch..."
+          git push "https://x-access-token:${{ secrets.MIRROR_PAT }}@github.com/${{ secrets.MIRROR_REPO }}.git" :refs/heads/_mirror_write_test
