@@ -7,7 +7,7 @@ on:
         description: "Also test write access by pushing a temp branch (creates & deletes _mirror_write_test)"
         required: true
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
