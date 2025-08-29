@@ -1,7 +1,7 @@
 import json
 import os
 from typing import Any
-from app.core.utils import now_iso
+from core.utils import now_iso
 
 
 def load_json(path: str, default: Any):

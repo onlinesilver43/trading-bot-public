@@ -2,7 +2,7 @@ services:
   bot:
     build: ../app
     image: tb-app:latest
-    command: ["python","/app/bot.py"]
+    command: ["python","/app/main.py"]
     env_file:
       - ../.env
     environment:
@@ -18,7 +18,7 @@ services:
   ui:
     build: ../app
     image: tb-app:latest
-    command: ["bash","-lc","uvicorn ui:app --host 0.0.0.0 --port 8080"]
+    command: ["bash","-lc","uvicorn ui.ui:app --host 0.0.0.0 --port 8080"]
     env_file:
       - ../.env              # << add this line
     environment:

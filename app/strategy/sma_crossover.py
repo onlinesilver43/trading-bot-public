@@ -1,4 +1,7 @@
-from app.core.utils import sma_series
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from core.utils import sma_series
 
 
 def indicators(closes, fast: int, slow: int, closed_only: bool = True):

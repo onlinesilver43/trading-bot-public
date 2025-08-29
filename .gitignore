@@ -9,3 +9,18 @@ venv/
 
 # local backups
 *.bak
+
+# Test files and databases
+*.db
+comprehensive_test_report_*.json
+phase3_test_report_*.json
+test_*.json
+
+# Temporary files
+fix_imports.py
+cleanup_deployment.py
+
+# IDE and system files
+.DS_Store
+.vscode/
+.idea/

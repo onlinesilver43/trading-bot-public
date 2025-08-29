@@ -1,12 +1,12 @@
 import os
 import time
-from app.core.config import Config
-from app.core.utils import now_iso, tf_to_ms
-from app.state.store import load_json, save_json, ensure_defaults
-from app.exchange.ccxt_client import Client
-from app.strategy.sma_crossover import indicators, decide
-from app.portfolio.paper import buy as pw_buy, sell as pw_sell
-from app.exports.writers import (
+from core.config import Config
+from core.utils import now_iso, tf_to_ms
+from state.store import load_json, save_json, ensure_defaults
+from exchange.ccxt_client import Client
+from strategy.sma_crossover import indicators, decide
+from portfolio.paper import buy as pw_buy, sell as pw_sell
+from exports.writers import (
     write_bot_config,
     write_candles_with_signals,
     append_trades_detailed,
@@ -150,7 +150,7 @@ def main():
                         last_buy = None
 
             # snapshot + persist
-            from app.exports.writers import append_snapshot as _append_snapshot
+            from exports.writers import append_snapshot as _append_snapshot
 
             _append_snapshot(cfg, state)
 

@@ -1,6 +1,6 @@
 import uuid
-from app.core.utils import iso_from_ms, now_iso
-from app.state.store import save_json, load_json
+from core.utils import iso_from_ms, now_iso
+from state.store import save_json, load_json
 
 
 def write_bot_config(cfg, markets) -> None:
