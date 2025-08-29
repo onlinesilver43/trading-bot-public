@@ -82,6 +82,19 @@ echo "[done] Deployed and verified $TAG"
 - **Check bot state**: `curl http://127.0.0.1:8080/api/state` on droplet
 - **GitHub CLI**: Use `gh` for workflow management
 
+## **🚨 CRITICAL: Terminal Commands to AVOID**
+- **NEVER use `git branch -a`** - This command breaks the terminal due to long output
+- **NEVER use `git status` with long output** - Can cause terminal issues
+- **Use `git branch` instead** - Shows only local branches safely
+- **Use `git status --porcelain`** - For clean, safe status output
+
+## **✅ SAFE Git Commands for Terminal**
+- **Check current branch**: `git branch --show-current`
+- **List local branches**: `git branch`
+- **Check status safely**: `git status --porcelain`
+- **Check remote branches safely**: `git ls-remote --heads origin`
+- **Get commit info**: `git log --oneline -5`
+
 ## User Preferences
 - **Commands**: Run directly without asking for approval
 - **WSL**: All commands should be WSL-friendly
@@ -103,4 +116,52 @@ echo "[done] Deployed and verified $TAG"
 - Uses SSH with password file for droplet access
 - Prefers comprehensive solutions over quick fixes
 - **NEW**: Focus on immediate profitability and self-funding development
+
+### **Ready for Next Session:**
+- All enhanced UI features are working in production
+- System is stable and ready for new features
+- Focus should be on Phase 3 implementation
+- No need to retest existing enhanced UI endpoints
+
+## **📝 WARMUP FILES UPDATE CADENCE - CRITICAL FOR ASSISTANTS**
+
+### **ALWAYS Update These Files After Major Changes:**
+- **`current-status.md`** - Update after every significant milestone or status change
+- **`assistant-guide.md`** - Update when adding new procedures or changing status
+- **`plan.md`** - Update when completing phases or changing priorities
+
+### **When to Update (Automatic, No User Prompt Needed):**
+1. **After completing a phase** - Mark as complete and update next steps
+2. **After deployment** - Update deployment status and validation results
+3. **After testing** - Update test results and system status
+4. **After changing priorities** - Update plan and immediate next steps
+5. **After adding new features** - Update current status and capabilities
+6. **Before ending session** - Ensure all files reflect current state
+
+### **Update Pattern:**
+```markdown
+## **✅ What Was Accomplished:**
+- [x] Feature A implemented and tested
+- [x] Feature B deployed to production
+- [x] Feature C validated and working
+
+## **📋 Next Session Will Focus On:**
+- Next phase implementation
+- New features to build
+- Testing requirements
+- Deployment plans
+```
+
+### **File Update Priority:**
+1. **`current-status.md`** - Most important, update after every change
+2. **`plan.md`** - Update when phases complete or priorities change
+3. **`assistant-guide.md`** - Update when adding new procedures
+
+### **Why This Matters:**
+- **Continuity**: Next assistant can continue seamlessly
+- **No Confusion**: Clear understanding of current state
+- **Efficiency**: No need to retest or rediscover what's working
+- **Progress Tracking**: Clear view of what's complete vs. what's next
+
+**REMEMBER**: Always update warmup files before ending session. This is automatic - no user prompt needed!
 

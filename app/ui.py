@@ -238,17 +238,38 @@ def api_retains_total():
 
 # --- NEW: Enhanced Infrastructure & Deployment Management ---
 
+# Import enhanced monitoring functions
+try:
+    from ui_enhanced import get_enhanced_system_health, get_enhanced_system_resources, get_enhanced_system_performance
+    ENHANCED_AVAILABLE = True
+except ImportError:
+    ENHANCED_AVAILABLE = False
+
 @app.get("/api/system/health")
 def api_system_health():
-    """Get basic system health status (enhanced features disabled)"""
-    return JSONResponse({
-        "status": "basic",
-        "message": "Enhanced system monitoring temporarily disabled",
-        "timestamp": "unknown",
-        "system": {"message": "Basic mode"},
-        "containers": {"message": "Basic mode"},
-        "api_health": {"message": "Basic mode"}
-    })
+    """Get real system health status with enhanced monitoring"""
+    if ENHANCED_AVAILABLE:
+        try:
+            result = get_enhanced_system_health()
+            return JSONResponse(result)
+        except Exception as e:
+            return JSONResponse({
+                "status": "error",
+                "message": f"Enhanced monitoring failed: {str(e)}",
+                "timestamp": "unknown",
+                "system": {"message": "Enhanced mode failed"},
+                "containers": {"message": "Enhanced mode failed"},
+                "api_health": {"message": "Enhanced mode failed"}
+            }, status_code=500)
+    else:
+        return JSONResponse({
+            "status": "basic",
+            "message": "Enhanced system monitoring not available",
+            "timestamp": "unknown",
+            "system": {"message": "Basic mode"},
+            "containers": {"message": "Basic mode"},
+            "api_health": {"message": "Basic mode"}
+        })
 
 
 @app.get("/api/system/deployments")
@@ -313,15 +334,52 @@ def api_rollback(backup_name: str):
 
 @app.get("/api/system/resources")
 def api_resources():
-    """Get basic system resource usage (enhanced features disabled)"""
-    return JSONResponse({
-        "status": "basic",
-        "message": "Enhanced system monitoring temporarily disabled",
-        "memory": {"message": "Basic mode"},
-        "disk": {"message": "Basic mode"},
-        "network": {"message": "Basic mode"},
-        "top_processes": []
-    })
+    """Get real system resource usage with enhanced monitoring"""
+    if ENHANCED_AVAILABLE:
+        try:
+            result = get_enhanced_system_resources()
+            return JSONResponse(result)
+        except Exception as e:
+            return JSONResponse({
+                "status": "error",
+                "message": f"Enhanced monitoring failed: {str(e)}",
+                "timestamp": "unknown",
+                "memory": {"message": "Enhanced mode failed"},
+                "disk": {"message": "Enhanced mode failed"},
+                "network": {"message": "Enhanced mode failed"},
+                "top_processes": []
+            }, status_code=500)
+    else:
+        return JSONResponse({
+            "status": "basic",
+            "message": "Enhanced system monitoring not available",
+            "timestamp": "unknown",
+            "memory": {"message": "Basic mode"},
+            "disk": {"message": "Basic mode"},
+            "network": {"message": "Basic mode"},
+            "top_processes": []
+        })
+
+
+@app.get("/api/system/performance")
+def api_system_performance():
+    """Get real-time system performance metrics with enhanced monitoring"""
+    if ENHANCED_AVAILABLE:
+        try:
+            result = get_enhanced_system_performance()
+            return JSONResponse(result)
+        except Exception as e:
+            return JSONResponse({
+                "status": "error",
+                "message": f"Enhanced monitoring failed: {str(e)}",
+                "timestamp": "unknown"
+            }, status_code=500)
+    else:
+        return JSONResponse({
+            "status": "basic",
+            "message": "Enhanced system monitoring not available",
+            "timestamp": "unknown"
+        })
 
 
 @app.get("/deployment", response_class=HTMLResponse)
