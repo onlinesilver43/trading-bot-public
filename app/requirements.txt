@@ -10,7 +10,7 @@ numpy>=1.24.0
 ta>=0.10.0
 
 # Database and storage
-sqlite3
+# sqlite3 is built-in to Python, no need to install
 
 # System monitoring
 psutil>=5.9.0
