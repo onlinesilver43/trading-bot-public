@@ -242,65 +242,15 @@ def api_retains_total():
 
 @app.get("/api/system/health")
 def api_system_health():
-    """Get comprehensive system health status"""
-    import subprocess
-    import psutil
-    
-    try:
-        # Container status
-        docker_status = {}
-        try:
-            result = subprocess.run(
-                ["docker", "ps", "--format", "{{.Names}},{{.Image}},{{.Status}}"],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            if result.returncode == 0:
-                for line in result.stdout.strip().split('\n'):
-                    if line:
-                        name, image, status = line.split(',', 2)
-                        docker_status[name] = {"image": image, "status": status}
-        except Exception as e:
-            docker_status = {"error": str(e)}
-        
-        # System resources
-        memory = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
-        cpu_percent = psutil.cpu_percent(interval=1)
-        
-        # API health checks
-        api_health = {}
-        try:
-            # Test bot API
-            import requests
-            response = requests.get("http://127.0.0.1:8080/api/state", timeout=5)
-            api_health["bot_api"] = {"status": "healthy", "response_time": response.elapsed.total_seconds()}
-        except Exception as e:
-            api_health["bot_api"] = {"status": "unhealthy", "error": str(e)}
-        
-        return JSONResponse({
-            "timestamp": psutil.boot_time(),
-            "system": {
-                "cpu_percent": cpu_percent,
-                "memory": {
-                    "total": memory.total,
-                    "available": memory.available,
-                    "percent": memory.percent
-                },
-                "disk": {
-                    "total": disk.total,
-                    "used": disk.used,
-                    "free": disk.free,
-                    "percent": disk.percent
-                }
-            },
-            "containers": docker_status,
-            "api_health": api_health,
-            "status": "healthy" if docker_status and not any("error" in str(v) for v in docker_status.values()) else "degraded"
-        })
-    except Exception as e:
-        return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
+    """Get basic system health status (enhanced features disabled)"""
+    return JSONResponse({
+        "status": "basic",
+        "message": "Enhanced system monitoring temporarily disabled",
+        "timestamp": "unknown",
+        "system": {"message": "Basic mode"},
+        "containers": {"message": "Basic mode"},
+        "api_health": {"message": "Basic mode"}
+    })
 
 
 @app.get("/api/system/deployments")
@@ -365,56 +315,15 @@ def api_rollback(backup_name: str):
 
 @app.get("/api/system/resources")
 def api_resources():
-    """Get detailed system resource usage"""
-    try:
-        import psutil
-        
-        # Memory details
-        memory = psutil.virtual_memory()
-        swap = psutil.swap_memory()
-        
-        # Disk details
-        disk = psutil.disk_usage('/')
-        
-        # Network details
-        network = psutil.net_io_counters()
-        
-        # Process details
-        processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
-            try:
-                processes.append(proc.info)
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-        
-        # Sort by CPU usage
-        processes.sort(key=lambda x: x.get('cpu_percent', 0) or 0, reverse=True)
-        
-        return JSONResponse({
-            "memory": {
-                "total": memory.total,
-                "available": memory.available,
-                "used": memory.used,
-                "percent": memory.percent,
-                "swap_total": swap.total,
-                "swap_used": swap.used
-            },
-            "disk": {
-                "total": disk.total,
-                "used": disk.used,
-                "free": disk.free,
-                "percent": disk.percent
-            },
-            "network": {
-                "bytes_sent": network.bytes_sent,
-                "bytes_recv": network.bytes_recv,
-                "packets_sent": network.packets_sent,
-                "packets_recv": network.packets_recv
-            },
-            "top_processes": processes[:10]  # Top 10 by CPU usage
-        })
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    """Get basic system resource usage (enhanced features disabled)"""
+    return JSONResponse({
+        "status": "basic",
+        "message": "Enhanced system monitoring temporarily disabled",
+        "memory": {"message": "Basic mode"},
+        "disk": {"message": "Basic mode"},
+        "network": {"message": "Basic mode"},
+        "top_processes": []
+    })
 
 
 @app.get("/deployment", response_class=HTMLResponse)
