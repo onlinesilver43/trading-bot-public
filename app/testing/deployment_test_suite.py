@@ -145,6 +145,28 @@ class DeploymentTester:
             if result['error']:
                 print(f"    └─ Error: {result['error']}")
         
+        # Print Phase 4 component results if available
+        if 'phase4_components' in summary and summary['phase4_components']['status'] == 'completed':
+            print()
+            print("🚀 PHASE 4 COMPONENT RESULTS:")
+            print("-" * 60)
+            phase4 = summary['phase4_components']
+            for component, result in phase4['components'].items():
+                if result['status'] == 'success':
+                    status_icon = "✅"
+                elif result['status'] == 'warning':
+                    status_icon = "⚠️"
+                elif result['status'] == 'error':
+                    status_icon = "❌"
+                else:
+                    status_icon = "⏸️"
+                
+                print(f"{status_icon} {component:<20} {result['status']:<15}")
+                if result['error']:
+                    print(f"    └─ {result['error']}")
+            
+            print(f"\n📊 Phase 4 Summary: {phase4['summary']['success']}✅ {phase4['summary']['warning']}⚠️ {phase4['summary']['error']}❌")
+        
         print()
         print("=" * 60)
     
@@ -210,6 +232,76 @@ class DeploymentTester:
                 "error": state_result.get("error", "Unknown error")
             }
     
+    def test_phase4_components(self) -> Dict[str, Any]:
+        """Test Phase 4 components after deployment"""
+        print("\n🚀 Testing Phase 4 Components...")
+        
+        phase4_results = {
+            "master_agent": {"status": "not_tested", "error": None},
+            "historical_analyzer": {"status": "not_tested", "error": None},
+            "strategy_discovery": {"status": "not_tested", "error": None},
+            "bot_orchestrator": {"status": "not_tested", "error": None},
+            "data_connector": {"status": "not_tested", "error": None}
+        }
+        
+        try:
+            # Test 1: Historical Data Access
+            print("  📊 Testing Historical Data Access...")
+            history_result = self.test_endpoint("history_manifest", "/api/history/manifest")
+            if history_result["status"] == "success":
+                if history_result["data"] and history_result["data"].get("status") != "no_data":
+                    phase4_results["data_connector"]["status"] = "success"
+                    print("    ✅ Historical data accessible")
+                else:
+                    phase4_results["data_connector"]["status"] = "warning"
+                    phase4_results["data_connector"]["error"] = "No historical data available yet"
+                    print("    ⚠️  No historical data available (may be normal for new deployment)")
+            else:
+                phase4_results["data_connector"]["status"] = "error"
+                phase4_results["data_connector"]["error"] = f"History endpoint failed: {history_result.get('error')}"
+                print("    ❌ Historical data endpoint failed")
+            
+            # Test 2: Enhanced System Status
+            print("  🔧 Testing Enhanced System Status...")
+            health_result = self.test_endpoint("system_health", "/api/system/health")
+            if health_result["status"] == "success" and health_result["data"]:
+                data = health_result["data"]
+                if data.get("status") == "enhanced":
+                    print("    ✅ Enhanced system monitoring active")
+                else:
+                    print("    ⚠️  Basic system monitoring (enhanced features may not be deployed)")
+            
+            # Test 3: Strategy Endpoints (if they exist)
+            print("  🎯 Testing Strategy Endpoints...")
+            # Note: These endpoints may not exist yet in current deployment
+            print("    ℹ️  Strategy endpoints not yet implemented (Phase 4 in progress)")
+            
+            # Test 4: Performance Monitoring
+            print("  📈 Testing Performance Monitoring...")
+            perf_result = self.test_endpoint("system_performance", "/api/system/performance")
+            if perf_result["status"] == "success":
+                print("    ✅ Performance monitoring active")
+            else:
+                print("    ⚠️  Performance monitoring not available")
+            
+        except Exception as e:
+            print(f"    ❌ Phase 4 testing error: {str(e)}")
+            for component in phase4_results:
+                if phase4_results[component]["status"] == "not_tested":
+                    phase4_results[component]["status"] = "error"
+                    phase4_results[component]["error"] = f"Testing error: {str(e)}"
+        
+        return {
+            "status": "completed",
+            "components": phase4_results,
+            "summary": {
+                "tested": sum(1 for c in phase4_results.values() if c["status"] != "not_tested"),
+                "success": sum(1 for c in phase4_results.values() if c["status"] == "success"),
+                "warning": sum(1 for c in phase4_results.values() if c["status"] == "warning"),
+                "error": sum(1 for c in phase4_results.values() if c["status"] == "error")
+            }
+        }
+    
     def run_comprehensive_test(self):
         """Run the complete deployment test suite"""
         print("🚀 Starting Comprehensive Deployment Test Suite")
@@ -221,6 +313,10 @@ class DeploymentTester:
         # Test bot functionality
         bot_test = self.test_bot_functionality()
         summary["bot_functionality"] = bot_test
+        
+        # Test Phase 4 components
+        phase4_test = self.test_phase4_components()
+        summary["phase4_components"] = phase4_test
         
         # Print summary
         self.print_summary(summary)

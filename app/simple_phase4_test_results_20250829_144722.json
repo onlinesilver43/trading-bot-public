@@ -1,0 +1,231 @@
+{
+  "status": "success",
+  "timestamp": "2025-08-29T14:47:22.036121",
+  "test_results": {
+    "data_connector": {
+      "status": "success",
+      "data_info": {
+        "total_files": 6,
+        "total_size_mb": 0.1,
+        "symbols": [
+          "BTCUSDT",
+          "ETHUSDT"
+        ],
+        "intervals": [
+          "1h",
+          "5m",
+          "1d"
+        ],
+        "last_updated": "2025-08-29T14:47:21.636482"
+      },
+      "test_results": {
+        "BTCUSDT_1h": {
+          "status": "success",
+          "rows": 100,
+          "columns": [
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "symbol",
+            "interval"
+          ],
+          "data_quality": "good"
+        },
+        "BTCUSDT_5m": {
+          "status": "success",
+          "rows": 100,
+          "columns": [
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "symbol",
+            "interval"
+          ],
+          "data_quality": "good"
+        },
+        "BTCUSDT_1d": {
+          "status": "success",
+          "rows": 30,
+          "columns": [
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "symbol",
+            "interval"
+          ],
+          "data_quality": "good"
+        },
+        "ETHUSDT_1h": {
+          "status": "success",
+          "rows": 100,
+          "columns": [
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "symbol",
+            "interval"
+          ],
+          "data_quality": "good"
+        },
+        "ETHUSDT_5m": {
+          "status": "success",
+          "rows": 100,
+          "columns": [
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "symbol",
+            "interval"
+          ],
+          "data_quality": "good"
+        },
+        "ETHUSDT_1d": {
+          "status": "success",
+          "rows": 30,
+          "columns": [
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "symbol",
+            "interval"
+          ],
+          "data_quality": "good"
+        }
+      }
+    },
+    "basic_analysis": {
+      "status": "success",
+      "analysis_results": {
+        "BTCUSDT": {
+          "symbol": "BTCUSDT",
+          "price_analysis": {
+            "start_price": 49953.24,
+            "end_price": 37283.23,
+            "price_change_percent": -25.36,
+            "volatility_percent": 13.65
+          },
+          "volume_analysis": {
+            "average_volume": 39761.28,
+            "volume_trend_percent": 77.13
+          },
+          "trend_analysis": {
+            "trend": "bullish",
+            "data_points": 500
+          }
+        },
+        "ETHUSDT": {
+          "symbol": "ETHUSDT",
+          "price_analysis": {
+            "start_price": 2997.19,
+            "end_price": 2236.99,
+            "price_change_percent": -25.36,
+            "volatility_percent": 13.65
+          },
+          "volume_analysis": {
+            "average_volume": 39761.28,
+            "volume_trend_percent": 77.13
+          },
+          "trend_analysis": {
+            "trend": "bullish",
+            "data_points": 500
+          }
+        }
+      },
+      "data_points_analyzed": {
+        "BTCUSDT": 500,
+        "ETHUSDT": 500
+      }
+    },
+    "strategy_simulation": {
+      "status": "success",
+      "strategies_tested": [
+        "sma_crossover",
+        "mean_reversion",
+        "momentum"
+      ],
+      "strategy_results": {
+        "sma_crossover": {
+          "strategy": "SMA Crossover",
+          "current_signal": "buy",
+          "signal_strength": 1.36,
+          "sma_5": 37501.55,
+          "sma_20": 36999.59
+        },
+        "mean_reversion": {
+          "strategy": "Mean Reversion",
+          "current_signal": "hold",
+          "z_score": -0.8,
+          "current_price": 37283.23,
+          "mean_price": 39235.32,
+          "deviation_percent": 4.98
+        },
+        "momentum": {
+          "strategy": "Momentum",
+          "current_signal": "hold",
+          "1h_momentum": -0.57,
+          "5h_momentum": 2.47,
+          "momentum_strength": "weak"
+        }
+      },
+      "data_points_used": 200
+    },
+    "bot_management": {
+      "status": "success",
+      "bot_status": {
+        "bot_1": {
+          "status": "active",
+          "symbol": "BTCUSDT",
+          "strategy": "sma_crossover",
+          "capital_allocated": 500.0,
+          "current_position": "long",
+          "pnl": 25.5
+        },
+        "bot_2": {
+          "status": "active",
+          "symbol": "ETHUSDT",
+          "strategy": "mean_reversion",
+          "capital_allocated": 300.0,
+          "current_position": "flat",
+          "pnl": -5.2
+        },
+        "bot_3": {
+          "status": "standby",
+          "symbol": "BNBUSDT",
+          "strategy": "momentum",
+          "capital_allocated": 0.0,
+          "current_position": "none",
+          "pnl": 0.0
+        }
+      },
+      "portfolio_metrics": {
+        "total_capital": 800.0,
+        "total_pnl": 20.3,
+        "active_bots": 2,
+        "roi_percent": 2.54
+      }
+    }
+  },
+  "summary": {
+    "total_tests": 4,
+    "passed_tests": 4,
+    "failed_tests": 0
+  }
+}

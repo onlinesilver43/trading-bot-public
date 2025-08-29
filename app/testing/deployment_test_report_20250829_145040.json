@@ -1,0 +1,615 @@
+{
+  "timestamp": "2025-08-29T14:50:39.482095",
+  "base_url": "http://64.23.214.191:8080",
+  "total_endpoints": 9,
+  "successful_endpoints": 9,
+  "failed_endpoints": 0,
+  "success_rate": 100.0,
+  "results": [
+    {
+      "name": "system_health",
+      "endpoint": "/api/system/health",
+      "url": "http://64.23.214.191:8080/api/system/health",
+      "status": "success",
+      "response_time": 1255.85,
+      "status_code": 200,
+      "error": null,
+      "data": {
+        "status": "enhanced",
+        "message": "Enhanced system monitoring active",
+        "timestamp": "2025-08-29T20:50:33.523591",
+        "system": {
+          "cpu_percent": 0.7,
+          "memory": {
+            "total_gb": 7.75,
+            "available_gb": 7.01,
+            "percent": 9.7,
+            "used_gb": 0.45
+          },
+          "disk": {
+            "total_gb": 231.65,
+            "used_gb": 5.2,
+            "free_gb": 226.43,
+            "percent": 2.25
+          }
+        },
+        "containers": {
+          "message": "Docker package not available"
+        },
+        "api_health": {
+          "status": "healthy",
+          "endpoints": {
+            "system_health": "working",
+            "system_resources": "working",
+            "system_deployments": "working",
+            "history_manifest": "working",
+            "history_status": "working"
+          },
+          "timestamp": "2025-08-29T20:50:33.523577"
+        }
+      }
+    },
+    {
+      "name": "system_resources",
+      "endpoint": "/api/system/resources",
+      "url": "http://64.23.214.191:8080/api/system/resources",
+      "status": "success",
+      "response_time": 92.08,
+      "status_code": 200,
+      "error": null,
+      "data": {
+        "status": "enhanced",
+        "message": "Enhanced system monitoring active",
+        "timestamp": "2025-08-29T20:50:34.117408",
+        "memory": {
+          "total_gb": 7.75,
+          "available_gb": 7.01,
+          "used_gb": 0.45,
+          "percent": 9.7,
+          "swap_total_gb": 0.0,
+          "swap_used_gb": 0.0,
+          "swap_percent": 0.0
+        },
+        "disk": {
+          "/dev/vda1": {
+            "mountpoint": "/etc/hosts",
+            "fstype": "ext4",
+            "total_gb": 231.65,
+            "used_gb": 5.2,
+            "free_gb": 226.43,
+            "percent": 2.25
+          }
+        },
+        "network": {
+          "bytes_sent_gb": 0.01,
+          "bytes_recv_gb": 0.0,
+          "packets_sent": 11618,
+          "packets_recv": 9994,
+          "errin": 0,
+          "errout": 0,
+          "dropin": 0,
+          "dropout": 0
+        },
+        "top_processes": [
+          {
+            "pid": 1,
+            "name": "uvicorn",
+            "cpu_percent": 0.3,
+            "memory_percent": 0.6,
+            "memory_mb": 49.2
+          }
+        ]
+      }
+    },
+    {
+      "name": "system_performance",
+      "endpoint": "/api/system/performance",
+      "url": "http://64.23.214.191:8080/api/system/performance",
+      "status": "success",
+      "response_time": 96.8,
+      "status_code": 200,
+      "error": null,
+      "data": {
+        "status": "enhanced",
+        "message": "Enhanced performance monitoring active",
+        "timestamp": "2025-08-29T20:50:34.690078",
+        "cpu": {
+          "count": 4,
+          "frequency_mhz": 2000.0,
+          "min_mhz": 0.0,
+          "max_mhz": 0.0,
+          "ctx_switches": 15785957,
+          "interrupts": 14622978,
+          "soft_interrupts": 8001398,
+          "syscalls": 0
+        },
+        "memory": {
+          "total_gb": 7.75,
+          "available_gb": 7.01,
+          "used_gb": 0.45,
+          "percent": 9.7,
+          "swap_total_gb": 0.0,
+          "swap_used_gb": 0.0,
+          "swap_percent": 0.0
+        },
+        "disk_io": {
+          "read_count": 51517,
+          "write_count": 287196,
+          "read_bytes_gb": 1.13,
+          "write_bytes_gb": 11.89,
+          "read_time_ms": 7321,
+          "write_time_ms": 250482
+        },
+        "network_io": {
+          "bytes_sent_gb": 0.01,
+          "bytes_recv_gb": 0.0,
+          "packets_sent": 11620,
+          "packets_recv": 9997
+        },
+        "load_average": {
+          "1min": 0.0,
+          "5min": 0.0,
+          "15min": 0.0
+        },
+        "temperatures": {}
+      }
+    },
+    {
+      "name": "system_deployments",
+      "endpoint": "/api/system/deployments",
+      "url": "http://64.23.214.191:8080/api/system/deployments",
+      "status": "success",
+      "response_time": 95.19,
+      "status_code": 200,
+      "error": null,
+      "data": {
+        "deployments": [],
+        "current": {
+          "branch": "deploy-20250829-1910-reorganized-path-fix",
+          "commit": "3da19779d2eeb39643a30f7b6192b105d00923b1",
+          "deploy_tag": "deploy-20250829-1910-reorganized-path-fix"
+        }
+      }
+    },
+    {
+      "name": "bot_state",
+      "endpoint": "/api/state",
+      "url": "http://64.23.214.191:8080/api/state",
+      "status": "success",
+      "response_time": 93.33,
+      "status_code": 200,
+      "error": null,
+      "data": {
+        "state": {
+          "start_cash_usd": 1000.0,
+          "cash_usd": -0.04657075780321108,
+          "trade_coin_units": 0.008535541597903736,
+          "stash_coin_units": 0.000482739388,
+          "coin_units": 0.009018280985903735,
+          "fees_paid_usd": 1.8410757931899056,
+          "pnl_usd": -7.876647174971497,
+          "unrealized_pnl_usd": 0.0,
+          "position": "flat",
+          "entry_price": null,
+          "last_action": "skip",
+          "last_signal": "sell",
+          "last_rebalance_ts": null,
+          "symbol": "BTC/USDT",
+          "profile": "blended_1000_trendonly",
+          "skip_reason": "",
+          "last_price": 107895.36,
+          "equity_usd": 972.9841027974352,
+          "updated_at": "2025-08-29T20:50:24.764643+00:00",
+          "last_trade_close_ts": 1756480200000,
+          "timeframe": "5m",
+          "units": 0.0,
+          "start_coin_units": 0.0,
+          "last_trade_bar_ts": 0,
+          "rules": {
+            "CONFIRM_BARS": 3,
+            "MIN_HOLD_BARS": 5,
+            "THRESHOLD_PCT": 0.001,
+            "MIN_TRADE_USD": 20.0,
+            "FAST": 7,
+            "SLOW": 25,
+            "FEE_RATE": 0.001
+          }
+        },
+        "trades": [
+          {
+            "t": "2025-08-29T03:40:00+00:00",
+            "type": "buy",
+            "price": 111817.00055999999,
+            "units": 0.0013421540704362052,
+            "fee_usd": 0.150076,
+            "cash_usd": 849.778563,
+            "coin_units": 0.00134215407
+          },
+          {
+            "t": "2025-08-29T04:00:00+00:00",
+            "type": "buy",
+            "price": 111984.14408999999,
+            "units": 0.0013401518392036767,
+            "fee_usd": 0.150076,
+            "cash_usd": 699.554347,
+            "coin_units": 0.00268230591
+          },
+          {
+            "t": "2025-08-29T04:35:00+00:00",
+            "type": "buy",
+            "price": 111904.02404999999,
+            "units": 0.0013405223229468275,
+            "fee_usd": 0.15001,
+            "cash_usd": 549.39516,
+            "coin_units": 0.004022828233
+          },
+          {
+            "t": "2025-08-29T05:00:00+00:00",
+            "type": "retain_to_stash",
+            "price": 111444.25,
+            "units": 0.000482739388,
+            "fee_usd": 0.0,
+            "cash_usd": 943.469908,
+            "coin_units": 0.000482739388,
+            "note": "regime=up, pct=0.120, min_retain_usd=5.0"
+          },
+          {
+            "t": "2025-08-29T05:00:00+00:00",
+            "type": "sell",
+            "price": 111444.25,
+            "units": -0.003540088845,
+            "fee_usd": 0.448321,
+            "cash_usd": 943.469908,
+            "coin_units": 0.000482739388,
+            "pnl": -1.849592,
+            "note": "regime=up"
+          },
+          {
+            "t": "2025-08-29T06:10:00+00:00",
+            "type": "buy",
+            "price": 111529.586925,
+            "units": 0.0013419555122124584,
+            "fee_usd": 0.149668,
+            "cash_usd": 793.656087,
+            "coin_units": 0.0018246949
+          },
+          {
+            "t": "2025-08-29T06:30:00+00:00",
+            "type": "sell",
+            "price": 110995.81433000001,
+            "units": -0.003540088845,
+            "fee_usd": 0.148951,
+            "cash_usd": 793.656464,
+            "coin_units": 0.0018246949,
+            "pnl": -0.716299,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T06:55:00+00:00",
+            "type": "sell",
+            "price": 110991.126675,
+            "units": -0.003540088845,
+            "fee_usd": 0.148945,
+            "cash_usd": 793.657597,
+            "coin_units": 0.0018246949,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T07:15:00+00:00",
+            "type": "sell",
+            "price": 110554.01534000001,
+            "units": -0.003540088845,
+            "fee_usd": 0.148359,
+            "cash_usd": 793.659107,
+            "coin_units": 0.0018246949,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T07:35:00+00:00",
+            "type": "sell",
+            "price": 110435.164795,
+            "units": -0.003540088845,
+            "fee_usd": 0.148199,
+            "cash_usd": 793.660617,
+            "coin_units": 0.0018246949,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T07:55:00+00:00",
+            "type": "sell",
+            "price": 110230.387235,
+            "units": -0.003540088845,
+            "fee_usd": 0.147924,
+            "cash_usd": 793.662127,
+            "coin_units": 0.0018246949,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T08:20:00+00:00",
+            "type": "sell",
+            "price": 109932.26637,
+            "units": -0.003540088845,
+            "fee_usd": 0.147524,
+            "cash_usd": 793.662882,
+            "coin_units": 0.0018246949,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T08:40:00+00:00",
+            "type": "sell",
+            "price": 109819.91257500001,
+            "units": -0.003540088845,
+            "fee_usd": 0.147373,
+            "cash_usd": 793.664392,
+            "coin_units": 0.0018246949,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T09:00:00+00:00",
+            "type": "sell",
+            "price": 109941.85157500001,
+            "units": -0.003540088845,
+            "fee_usd": 0.147537,
+            "cash_usd": 793.665902,
+            "coin_units": 0.0018246949,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T09:20:00+00:00",
+            "type": "sell",
+            "price": 109696.074525,
+            "units": -0.003540088845,
+            "fee_usd": 0.147207,
+            "cash_usd": 793.667412,
+            "coin_units": 0.0018246949,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T09:50:00+00:00",
+            "type": "buy",
+            "price": 110101.45321499999,
+            "units": 0.00135552289685951,
+            "fee_usd": 0.149245,
+            "cash_usd": 644.274258,
+            "coin_units": 0.003180217797
+          },
+          {
+            "t": "2025-08-29T10:10:00+00:00",
+            "type": "buy",
+            "price": 110048.65682999999,
+            "units": 0.0013556407878121326,
+            "fee_usd": 0.149186,
+            "cash_usd": 494.93985,
+            "coin_units": 0.004535858585
+          },
+          {
+            "t": "2025-08-29T10:40:00+00:00",
+            "type": "sell",
+            "price": 109692.25643500002,
+            "units": -0.003540088845,
+            "fee_usd": 0.444596,
+            "cash_usd": 494.940085,
+            "coin_units": 0.004535858585,
+            "pnl": -1.444533,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T11:15:00+00:00",
+            "type": "buy",
+            "price": 110221.32312,
+            "units": 0.0013542792805343663,
+            "fee_usd": 0.14927,
+            "cash_usd": 345.520832,
+            "coin_units": 0.005890137865
+          },
+          {
+            "t": "2025-08-29T11:35:00+00:00",
+            "type": "sell",
+            "price": 109825.27989,
+            "units": -0.003540088845,
+            "fee_usd": 0.593869,
+            "cash_usd": 345.521325,
+            "coin_units": 0.005890137865,
+            "pnl": -2.141564,
+            "note": "regime=up"
+          },
+          {
+            "t": "2025-08-29T12:00:00+00:00",
+            "type": "buy",
+            "price": 110219.412165,
+            "units": 0.001353984189147069,
+            "fee_usd": 0.149235,
+            "cash_usd": 196.137405,
+            "coin_units": 0.007244122055
+          },
+          {
+            "t": "2025-08-29T12:20:00+00:00",
+            "type": "buy",
+            "price": 110418.94187999998,
+            "units": 0.0013531973623789174,
+            "fee_usd": 0.149419,
+            "cash_usd": 46.569739,
+            "coin_units": 0.008597319417
+          },
+          {
+            "t": "2025-08-29T12:40:00+00:00",
+            "type": "buy",
+            "price": 110627.26598999999,
+            "units": 0.00042096156895928195,
+            "fee_usd": 0.04657,
+            "cash_usd": -0.04657,
+            "coin_units": 0.009018280986
+          },
+          {
+            "t": "2025-08-29T13:30:00+00:00",
+            "type": "sell",
+            "price": 110425.20977500001,
+            "units": -0.003540088845,
+            "fee_usd": 0.942539,
+            "cash_usd": -0.04657,
+            "coin_units": 0.009018280986,
+            "pnl": -1.724659,
+            "note": "regime=up"
+          },
+          {
+            "t": "2025-08-29T13:50:00+00:00",
+            "type": "sell",
+            "price": 109481.681775,
+            "units": -0.003540088845,
+            "fee_usd": 0.934485,
+            "cash_usd": -0.04657,
+            "coin_units": 0.009018280986,
+            "pnl": 0.0,
+            "note": "regime=up"
+          },
+          {
+            "t": "2025-08-29T14:10:00+00:00",
+            "type": "sell",
+            "price": 108529.97786500001,
+            "units": -0.003540088845,
+            "fee_usd": 0.926362,
+            "cash_usd": -0.04657,
+            "coin_units": 0.009018280986,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T14:30:00+00:00",
+            "type": "sell",
+            "price": 108715.18521500002,
+            "units": -0.003540088845,
+            "fee_usd": 0.927943,
+            "cash_usd": -0.04657,
+            "coin_units": 0.009018280986,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T14:50:00+00:00",
+            "type": "sell",
+            "price": 108421.53211500001,
+            "units": -0.003540088845,
+            "fee_usd": 0.925436,
+            "cash_usd": -0.04657,
+            "coin_units": 0.009018280986,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          },
+          {
+            "t": "2025-08-29T15:10:00+00:00",
+            "type": "sell",
+            "price": 108389.778,
+            "units": -0.003540088845,
+            "fee_usd": 0.925165,
+            "cash_usd": -0.04657,
+            "coin_units": 0.009018280986,
+            "pnl": 0.0,
+            "note": "regime=chop"
+          }
+        ]
+      }
+    },
+    {
+      "name": "history_manifest",
+      "endpoint": "/api/history/manifest",
+      "url": "http://64.23.214.191:8080/api/history/manifest",
+      "status": "success",
+      "response_time": 91.34,
+      "status_code": 200,
+      "error": null,
+      "data": {
+        "status": "no_data",
+        "message": "No history data has been fetched yet"
+      }
+    },
+    {
+      "name": "history_status",
+      "endpoint": "/api/history/status",
+      "url": "http://64.23.214.191:8080/api/history/status",
+      "status": "success",
+      "response_time": 94.74,
+      "status_code": 200,
+      "error": null,
+      "data": {
+        "status": "not_initialized",
+        "message": "History directory does not exist"
+      }
+    },
+    {
+      "name": "exports",
+      "endpoint": "/exports",
+      "url": "http://64.23.214.191:8080/exports",
+      "status": "success",
+      "response_time": 97.76,
+      "status_code": 200,
+      "error": null,
+      "data": "<!doctype html><html><head><meta charset=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/>\n    <title>Exports</title>\n    <style>body{font:14px system-ui;margin:20px} table{border-collapse:collapse} td,th{padding:8px 12px;border:1px solid #ccc}</style>\n    <h2>Exports</h2>\n    <p><a href=\"/api/export.zip\">Export Diagnostics (ZIP)</a> &nbsp; <a href=\"/api/source.zip\">Export Source (ZIP)</a></p>\n    <table><tr><th>File</th><th>Exists</th><th>Size (bytes)</th></tr><tr><t"
+    },
+    {
+      "name": "home",
+      "endpoint": "/",
+      "url": "http://64.23.214.191:8080/",
+      "status": "success",
+      "response_time": 101.03,
+      "status_code": 200,
+      "error": null,
+      "data": "<!doctype html>\n<html>\n<head>\n  <meta charset=\"utf-8\"/>\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/>\n  <title>Trading Bots \u2013 Status</title>\n  <style>\n:root{--bg:#0b1020;--card:#141a2d;--text:#e8ecff;--muted:#9aa4c7;--accent:#6ea8fe;--warn:#ffb74d;--green:#41d1a7;--red:#ff6b6b}\n*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial}\nh1{margin:0 0 16px;font-size:28px}.grid{displ"
+    }
+  ],
+  "bot_functionality": {
+    "status": "success",
+    "bot_status": {
+      "has_portfolio": false,
+      "has_trades": true,
+      "has_current_position": false,
+      "has_equity": false,
+      "trading_active": false
+    },
+    "portfolio_summary": {
+      "equity_usd": "N/A",
+      "position": "N/A",
+      "cash_usd": "N/A",
+      "coin_units": "N/A",
+      "total_trades": 29
+    }
+  },
+  "phase4_components": {
+    "status": "completed",
+    "components": {
+      "master_agent": {
+        "status": "not_tested",
+        "error": null
+      },
+      "historical_analyzer": {
+        "status": "not_tested",
+        "error": null
+      },
+      "strategy_discovery": {
+        "status": "not_tested",
+        "error": null
+      },
+      "bot_orchestrator": {
+        "status": "not_tested",
+        "error": null
+      },
+      "data_connector": {
+        "status": "warning",
+        "error": "No historical data available yet"
+      }
+    },
+    "summary": {
+      "tested": 1,
+      "success": 0,
+      "warning": 1,
+      "error": 0
+    }
+  }
+}

@@ -126,6 +126,62 @@ gh workflow run "Deploy to Droplet" --ref "$TAG"
 - [ ] No import errors in logs
 - [ ] System maintains 100% test success rate
 
+## 🔍 Production Validation Commands
+
+### **System Health Check**
+```bash
+# Check overall system health
+curl -s "http://64.23.214.191:8080/api/system/health" | python3 -m json.tool
+
+# Expected: status "enhanced", all endpoints "working"
+```
+
+### **API Endpoint Validation**
+```bash
+# Check system resources
+curl -s "http://64.23.214.191:8080/api/system/resources" | python3 -m json.tool
+
+# Check system performance  
+curl -s "http://64.23.214.191:8080/api/system/performance" | python3 -m json.tool
+
+# Check bot state
+curl -s "http://64.23.214.191:8080/api/state" | python3 -m json.tool
+```
+
+### **Historical Data Validation**
+```bash
+# Check history manifest
+curl -s "http://64.23.214.191:8080/api/history/manifest" | python3 -m json.tool
+
+# Check history status
+curl -s "http://64.23.214.191:8080/api/history/status" | python3 -m json.tool
+
+# Expected: Should show collected data or proper status
+```
+
+### **Deployment Verification**
+```bash
+# Check deployment status
+curl -s "http://64.23.214.191:8080/api/system/deployments" | python3 -m json.tool
+
+# Verify all 9 enhanced endpoints are responding
+```
+
+### **Phase 4 Component Validation**
+```bash
+# Test Phase 4 components on production
+cd app
+python3 strategy/production_data_connector.py
+
+# Test master agent functionality
+python3 strategy/master_agent.py
+
+# Test historical data analyzer
+python3 strategy/historical_data_analyzer.py
+
+# Expected: All components should work with production data
+```
+
 ## 🔄 Rollback Plan
 
 If deployment fails:
