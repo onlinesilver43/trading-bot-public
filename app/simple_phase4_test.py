@@ -15,6 +15,14 @@ import json
 # Import only the test data connector that we know works
 from strategy.test_local_data_connector import TestDataConnector
 
+# Try to import the collected data connector for real data testing
+try:
+    from strategy.collected_data_connector import CollectedDataConnector
+    REAL_DATA_AVAILABLE = True
+except ImportError:
+    REAL_DATA_AVAILABLE = False
+    print("⚠️  CollectedDataConnector not available - will use test data only")
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,11 +38,23 @@ class SimplePhase4Test:
     4. Bot Management - basic bot orchestration concepts
     """
     
-    def __init__(self):
-        self.test_data_connector = TestDataConnector()
-        self.test_results = {}
+    def __init__(self, use_real_data: bool = False):
+        self.use_real_data = use_real_data and REAL_DATA_AVAILABLE
         
-        logger.info("Simple Phase 4 Test initialized")
+        if self.use_real_data:
+            try:
+                self.data_connector = CollectedDataConnector()
+                logger.info("Simple Phase 4 Test initialized with REAL DATA connector")
+            except Exception as e:
+                logger.warning(f"Failed to initialize real data connector: {e}")
+                self.use_real_data = False
+                self.data_connector = TestDataConnector()
+                logger.info("Falling back to test data connector")
+        else:
+            self.data_connector = TestDataConnector()
+            logger.info("Simple Phase 4 Test initialized with test data connector")
+        
+        self.test_results = {}
     
     async def run_simple_test(self) -> Dict[str, Any]:
         """Run simple Phase 4 system test"""
@@ -89,7 +109,7 @@ class SimplePhase4Test:
             logger.info("Testing test data connector...")
             
             # Get available data
-            data_info = self.test_data_connector.get_available_data()
+            data_info = self.data_connector.get_available_data()
             
             if not data_info:
                 return {"status": "error", "error": "No data info available"}
@@ -100,20 +120,28 @@ class SimplePhase4Test:
                 for interval in data_info['statistics']['intervals']:
                     logger.info(f"Testing {symbol} {interval}...")
                     
-                    sample_data = self.test_data_connector.get_symbol_data(symbol, interval, limit=100)
+                    if self.use_real_data:
+                        # Use async method for real data
+                        sample_data = await self.data_connector.get_symbol_data(symbol, interval, limit=100)
+                    else:
+                        # Use sync method for test data
+                        sample_data = self.data_connector.get_symbol_data(symbol, interval, limit=100)
                     
                     if sample_data is not None and not sample_data.empty:
                         test_results[f"{symbol}_{interval}"] = {
                             "status": "success",
                             "rows": len(sample_data),
                             "columns": list(sample_data.columns),
-                            "data_quality": "good"
+                            "data_quality": "good",
+                            "data_source": "real_data" if self.use_real_data else "test_data"
                         }
+                        logger.info(f"✅ {symbol} {interval}: {len(sample_data)} data points ({'real' if self.use_real_data else 'test'} data)")
                     else:
                         test_results[f"{symbol}_{interval}"] = {
                             "status": "error",
                             "error": "No data retrieved"
                         }
+                        logger.error(f"❌ {symbol} {interval}: No data returned")
             
             return {
                 "status": "success",
@@ -131,8 +159,12 @@ class SimplePhase4Test:
             logger.info("Testing basic market analysis...")
             
             # Get sample data for analysis
-            btc_data = self.test_data_connector.get_symbol_data("BTCUSDT", "1h", limit=500)
-            eth_data = self.test_data_connector.get_symbol_data("ETHUSDT", "1h", limit=500)
+            if self.use_real_data:
+                btc_data = await self.data_connector.get_symbol_data("BTCUSDT", "1h", limit=500)
+                eth_data = await self.data_connector.get_symbol_data("ETHUSDT", "1h", limit=500)
+            else:
+                btc_data = self.data_connector.get_symbol_data("BTCUSDT", "1h", limit=500)
+                eth_data = self.data_connector.get_symbol_data("ETHUSDT", "1h", limit=500)
             
             if btc_data is None or eth_data is None:
                 return {"status": "error", "error": "Failed to get market data"}
@@ -387,11 +419,20 @@ class SimplePhase4Test:
 
 def main():
     """Main test function"""
-    print("🚀 Simple Phase 4 Test - Core System Validation")
-    print("=" * 70)
+    import sys
+    
+    # Check if user wants to test with real data
+    use_real_data = "--real-data" in sys.argv
+    
+    if use_real_data:
+        print("🚀 Simple Phase 4 Test - Core System Validation with REAL DATA")
+        print("=" * 70)
+    else:
+        print("🚀 Simple Phase 4 Test - Core System Validation with TEST DATA")
+        print("=" * 70)
     
     # Initialize test
-    test = SimplePhase4Test()
+    test = SimplePhase4Test(use_real_data=use_real_data)
     
     # Run test
     async def run_test():
@@ -401,6 +442,7 @@ def main():
         print("\n📊 TEST RESULTS SUMMARY")
         print("=" * 50)
         print(f"Overall Status: {results['status']}")
+        print(f"Data Source: {'REAL DATA' if use_real_data else 'TEST DATA'}")
         print(f"Timestamp: {results['timestamp']}")
         print(f"Total Tests: {results['summary']['total_tests']}")
         print(f"Passed: {results['summary']['passed_tests']}")
@@ -420,12 +462,17 @@ def main():
     
     # Save results to file
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    results_file = f"simple_phase4_test_results_{timestamp}.json"
+    data_type = "real" if use_real_data else "test"
+    results_file = f"simple_phase4_test_results_{data_type}_{timestamp}.json"
     
     with open(results_file, 'w') as f:
         json.dump(results, f, indent=2, default=str)
     
     print(f"\n📁 Test results saved to: {results_file}")
+    
+    # Print usage instructions
+    if not use_real_data:
+        print("\n💡 To test with REAL DATA, run: python3 simple_phase4_test.py --real-data")
 
 if __name__ == "__main__":
     main()

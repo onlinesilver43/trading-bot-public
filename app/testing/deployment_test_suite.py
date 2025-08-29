@@ -367,7 +367,8 @@ class DeploymentTester:
             "historical_analyzer": {"status": "not_tested", "error": None},
             "strategy_discovery": {"status": "not_tested", "error": None},
             "bot_orchestrator": {"status": "not_tested", "error": None},
-            "data_connector": {"status": "not_tested", "error": None}
+            "data_connector": {"status": "not_tested", "error": None},
+            "real_data_access": {"status": "not_tested", "error": None}
         }
         
         try:
@@ -387,7 +388,22 @@ class DeploymentTester:
                 phase4_results["data_connector"]["error"] = f"History endpoint failed: {history_result.get('error')}"
                 print("    ❌ Historical data endpoint failed")
             
-            # Test 2: Enhanced System Status
+            # Test 2: Real Data Access (Enhanced)
+            print("  🔍 Testing Real Data Access...")
+            real_data_result = self._test_real_data_access()
+            if real_data_result["status"] == "success":
+                phase4_results["real_data_access"]["status"] = "success"
+                print(f"    ✅ Real data accessible: {real_data_result['details']}")
+            elif real_data_result["status"] == "warning":
+                phase4_results["real_data_access"]["status"] = "warning"
+                phase4_results["real_data_access"]["error"] = real_data_result.get("error", "Limited real data access")
+                print(f"    ⚠️  Limited real data access: {real_data_result.get('error')}")
+            else:
+                phase4_results["real_data_access"]["status"] = "error"
+                phase4_results["real_data_access"]["error"] = real_data_result.get("error", "Real data access failed")
+                print(f"    ❌ Real data access failed: {real_data_result.get('error')}")
+            
+            # Test 3: Enhanced System Status
             print("  🔧 Testing Enhanced System Status...")
             health_result = self.test_endpoint("system_health", "/api/system/health")
             if health_result["status"] == "success" and health_result["data"]:
@@ -397,12 +413,12 @@ class DeploymentTester:
                 else:
                     print("    ⚠️  Basic system monitoring (enhanced features may not be deployed)")
             
-            # Test 3: Strategy Endpoints (if they exist)
+            # Test 4: Strategy Endpoints (if they exist)
             print("  🎯 Testing Strategy Endpoints...")
             # Note: These endpoints may not exist yet in current deployment
             print("    ℹ️  Strategy endpoints not yet implemented (Phase 4 in progress)")
             
-            # Test 4: Performance Monitoring
+            # Test 5: Performance Monitoring
             print("  📈 Testing Performance Monitoring...")
             perf_result = self.test_endpoint("system_performance", "/api/system/performance")
             if perf_result["status"] == "success":
@@ -427,6 +443,61 @@ class DeploymentTester:
                 "error": sum(1 for c in phase4_results.values() if c["status"] == "error")
             }
         }
+    
+    def _test_real_data_access(self) -> Dict[str, Any]:
+        """Test access to real collected historical data"""
+        try:
+            import subprocess
+            import json
+            
+            print("    🔍 Checking collected data on server...")
+            
+            # Test SSH connection and data access
+            ssh_cmd = 'sshpass -f ~/.ssh/tb_pw ssh tb "cat /srv/trading-bots/history/manifest.json | jq \'.statistics\'"'
+            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                return {
+                    "status": "error",
+                    "error": f"SSH connection failed: {result.stderr}"
+                }
+            
+            try:
+                stats = json.loads(result.stdout)
+                
+                # Check if we have substantial data
+                total_files = stats.get("total_files", 0)
+                total_size_mb = round(stats.get("total_size_bytes", 0) / (1024 * 1024), 2)
+                symbols = list(stats.get("symbols", {}).keys())
+                intervals = list(stats.get("intervals", {}).keys())
+                
+                if total_files > 100 and total_size_mb > 10:
+                    return {
+                        "status": "success",
+                        "details": f"{total_files} files, {total_size_mb} MB, {len(symbols)} symbols, {len(intervals)} intervals"
+                    }
+                elif total_files > 0:
+                    return {
+                        "status": "warning",
+                        "error": f"Limited data: {total_files} files, {total_size_mb} MB"
+                    }
+                else:
+                    return {
+                        "status": "error",
+                        "error": "No collected data found"
+                    }
+                    
+            except json.JSONDecodeError:
+                return {
+                    "status": "error",
+                    "error": "Failed to parse manifest data"
+                }
+                
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"Real data testing error: {str(e)}"
+            }
     
     def run_comprehensive_test(self):
         """Run the complete deployment test suite"""

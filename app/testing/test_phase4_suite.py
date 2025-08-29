@@ -32,6 +32,13 @@ class MockMarketRegimeDetector:
     """Mock Market Regime Detector for testing"""
     pass
 
+# Try to import real data connector
+try:
+    from strategy.collected_data_connector import CollectedDataConnector
+    REAL_DATA_AVAILABLE = True
+except ImportError:
+    REAL_DATA_AVAILABLE = False
+
 # Mock enums
 class MarketRegime:
     TRENDING_UP = "trending_up"
@@ -77,6 +84,10 @@ class Phase4TestSuite:
         
         # Test mock systems
         self.test_mock_systems()
+        
+        # Test real data if available
+        if REAL_DATA_AVAILABLE:
+            self.test_real_data_access()
         
         # Generate test report
         self.generate_test_report()
@@ -178,6 +189,81 @@ class Phase4TestSuite:
         except Exception as e:
             self._record_test_result("Mock Systems", False, f"Test failed: {str(e)}")
     
+    def test_real_data_access(self):
+        """Test real data access capabilities"""
+        print("🧪 Testing Real Data Access...")
+        print("-" * 40)
+        
+        try:
+            # Test 1: Data Connector Initialization
+            self._test_data_connector_init()
+            
+            # Test 2: Data Availability Check
+            self._test_data_availability()
+            
+            # Test 3: Data Quality Validation
+            self._test_data_quality()
+            
+        except Exception as e:
+            self._record_test_result("Real Data Access", False, f"Test failed: {str(e)}")
+    
+    def _test_data_connector_init(self):
+        """Test data connector initialization"""
+        try:
+            # Initialize data connector
+            connector = CollectedDataConnector()
+            assert connector is not None
+            assert hasattr(connector, 'get_available_data')
+            
+            self._record_test_result("Data Connector Init", True, "Data connector initialized successfully")
+            
+        except Exception as e:
+            self._record_test_result("Data Connector Init", False, str(e))
+    
+    def _test_data_availability(self):
+        """Test data availability"""
+        try:
+            import asyncio
+            
+            # Test async data availability check
+            async def check_data():
+                connector = CollectedDataConnector()
+                data_info = await connector.get_available_data()
+                return data_info
+            
+            # Run async test
+            data_info = asyncio.run(check_data())
+            
+            if data_info and 'manifest' in data_info:
+                self._record_test_result("Data Availability", True, "Data availability check successful")
+            else:
+                self._record_test_result("Data Availability", False, "No data manifest found")
+                
+        except Exception as e:
+            self._record_test_result("Data Availability", False, str(e))
+    
+    def _test_data_quality(self):
+        """Test data quality validation"""
+        try:
+            import asyncio
+            
+            # Test async data quality check
+            async def check_quality():
+                connector = CollectedDataConnector()
+                summary = await connector.get_market_data_summary()
+                return summary
+            
+            # Run async test
+            summary = asyncio.run(check_quality())
+            
+            if summary and 'total_files' in summary and summary['total_files'] > 0:
+                self._record_test_result("Data Quality", True, f"Data quality check successful: {summary['total_files']} files")
+            else:
+                self._record_test_result("Data Quality", False, "No data files found")
+                
+        except Exception as e:
+            self._record_test_result("Data Quality", False, str(e))
+    
     def _test_mock_system_creation(self):
         """Test mock system creation"""
         try:
@@ -249,6 +335,12 @@ class Phase4TestSuite:
         print(f"Passed: {self.passed_tests} ✅")
         print(f"Failed: {self.failed_tests} ❌")
         print(f"Success Rate: {success_rate:.1f}%")
+        
+        # Show real data testing status
+        if REAL_DATA_AVAILABLE:
+            print(f"🔍 Real Data Testing: Available ✅")
+        else:
+            print(f"🔍 Real Data Testing: Not Available ⚠️")
         
         if success_rate == 100:
             print("\n🎉 ALL TESTS PASSED! Phase 4 system is fully operational!")
