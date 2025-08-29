@@ -240,79 +240,15 @@ def api_retains_total():
 
 @app.get("/api/system/health")
 def api_system_health():
-    """Get comprehensive system health status"""
-    try:
-        # Conditional imports to prevent crashes
-        import psutil
-        import requests
-        
-        # Get system info
-        cpu_percent = psutil.cpu_percent(interval=1)
-        memory = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
-        
-        # Get container info
-        containers = []
-        try:
-            import docker
-            client = docker.from_env()
-            for container in client.containers.list():
-                containers.append({
-                    "name": container.name,
-                    "status": container.status,
-                    "image": container.image.tags[0] if container.image.tags else container.image.id
-                })
-        except Exception:
-            containers = [{"message": "Docker info unavailable"}]
-        
-        # Test API health
-        api_health = {"status": "healthy", "response_time_ms": 0}
-        try:
-            import time
-            start_time = time.time()
-            response = requests.get("http://127.0.0.1:8080/api/state", timeout=5)
-            response_time = (time.time() - start_time) * 1000
-            api_health = {
-                "status": "healthy" if response.status_code == 200 else "unhealthy",
-                "response_time_ms": round(response_time, 2),
-                "status_code": response.status_code
-            }
-        except Exception as e:
-            api_health = {"status": "error", "error": str(e)}
-        
-        return JSONResponse({
-            "status": "enhanced",
-            "timestamp": psutil.boot_time(),
-            "system": {
-                "cpu_percent": cpu_percent,
-                "memory_percent": memory.percent,
-                "memory_available_gb": round(memory.available / (1024**3), 2),
-                "disk_percent": disk.percent,
-                "disk_free_gb": round(disk.free / (1024**3), 2)
-            },
-            "containers": containers,
-            "api_health": api_health
-        })
-    except ImportError as e:
-        # Fallback if dependencies not available
-        return JSONResponse({
-            "status": "basic",
-            "message": f"Enhanced monitoring unavailable: {str(e)}",
-            "timestamp": "unknown",
-            "system": {"message": "Dependencies missing"},
-            "containers": {"message": "Dependencies missing"},
-            "api_health": {"message": "Dependencies missing"}
-        })
-    except Exception as e:
-        # Fallback for any other errors
-        return JSONResponse({
-            "status": "error",
-            "message": f"System monitoring error: {str(e)}",
-            "timestamp": "unknown",
-            "system": {"message": "Error occurred"},
-            "containers": {"message": "Error occurred"},
-            "api_health": {"message": "Error occurred"}
-        })
+    """Get basic system health status (enhanced features disabled)"""
+    return JSONResponse({
+        "status": "basic",
+        "message": "Enhanced system monitoring temporarily disabled",
+        "timestamp": "unknown",
+        "system": {"message": "Basic mode"},
+        "containers": {"message": "Basic mode"},
+        "api_health": {"message": "Basic mode"}
+    })
 
 
 @app.get("/api/system/deployments")
@@ -377,84 +313,15 @@ def api_rollback(backup_name: str):
 
 @app.get("/api/system/resources")
 def api_resources():
-    """Get comprehensive system resource usage"""
-    try:
-        # Conditional imports to prevent crashes
-        import psutil
-        
-        # Get memory info
-        memory = psutil.virtual_memory()
-        swap = psutil.swap_memory()
-        
-        # Get disk info
-        disk = psutil.disk_usage('/')
-        disk_io = psutil.disk_io_counters()
-        
-        # Get network info
-        network = psutil.net_io_counters()
-        
-        # Get top processes by memory usage
-        top_processes = []
-        try:
-            processes = []
-            for proc in psutil.process_iter(['pid', 'name', 'memory_percent', 'cpu_percent']):
-                try:
-                    processes.append(proc.info)
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
-            
-            # Sort by memory usage and get top 10
-            processes.sort(key=lambda x: x['memory_percent'] or 0, reverse=True)
-            top_processes = processes[:10]
-        except Exception:
-            top_processes = [{"message": "Process info unavailable"}]
-        
-        return JSONResponse({
-            "status": "enhanced",
-            "memory": {
-                "total_gb": round(memory.total / (1024**3), 2),
-                "available_gb": round(memory.available / (1024**3), 2),
-                "used_gb": round(memory.used / (1024**3), 2),
-                "percent": memory.percent,
-                "swap_total_gb": round(swap.total / (1024**3), 2),
-                "swap_used_gb": round(swap.used / (1024**3), 2)
-            },
-            "disk": {
-                "total_gb": round(disk.total / (1024**3), 2),
-                "free_gb": round(disk.free / (1024**3), 2),
-                "used_gb": round(disk.used / (1024**3), 2),
-                "percent": disk.percent,
-                "read_bytes_gb": round(disk_io.read_bytes / (1024**3), 2) if disk_io else 0,
-                "write_bytes_gb": round(disk_io.write_bytes / (1024**3), 2) if disk_io else 0
-            },
-            "network": {
-                "bytes_sent_gb": round(network.bytes_sent / (1024**3), 2),
-                "bytes_recv_gb": round(network.bytes_recv / (1024**3), 2),
-                "packets_sent": network.packets_sent,
-                "packets_recv": network.packets_recv
-            },
-            "top_processes": top_processes
-        })
-    except ImportError as e:
-        # Fallback if dependencies not available
-        return JSONResponse({
-            "status": "basic",
-            "message": f"Enhanced monitoring unavailable: {str(e)}",
-            "memory": {"message": "Dependencies missing"},
-            "disk": {"message": "Dependencies missing"},
-            "network": {"message": "Dependencies missing"},
-            "top_processes": []
-        })
-    except Exception as e:
-        # Fallback for any other errors
-        return JSONResponse({
-            "status": "error",
-            "message": f"Resource monitoring error: {str(e)}",
-            "memory": {"message": "Error occurred"},
-            "disk": {"message": "Error occurred"},
-            "network": {"message": "Error occurred"},
-            "top_processes": []
-        })
+    """Get basic system resource usage (enhanced features disabled)"""
+    return JSONResponse({
+        "status": "basic",
+        "message": "Enhanced system monitoring temporarily disabled",
+        "memory": {"message": "Basic mode"},
+        "disk": {"message": "Basic mode"},
+        "network": {"message": "Basic mode"},
+        "top_processes": []
+    })
 
 
 @app.get("/deployment", response_class=HTMLResponse)
