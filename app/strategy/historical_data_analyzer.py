@@ -163,11 +163,11 @@ class HistoricalDataAnalyzer:
                 
                 for timeframe in self.timeframes:
                     data = await self._pull_symbol_data(symbol, timeframe)
-                                    if data is not None and not data.empty and len(data) >= self.min_data_points:
-                    symbol_data[timeframe] = data
-                    logger.info(f"  {timeframe}: {len(data)} data points")
-                else:
-                    logger.warning(f"  {timeframe}: Insufficient data ({len(data) if data is not None and not data.empty else 0} points)")
+                    if data is not None and not data.empty and len(data) >= self.min_data_points:
+                        symbol_data[timeframe] = data
+                        logger.info(f"  {timeframe}: {len(data)} data points")
+                    else:
+                        logger.warning(f"  {timeframe}: Insufficient data ({len(data) if data is not None and not data.empty else 0} points)")
                 
                 if symbol_data:
                     self.historical_data[symbol] = symbol_data
