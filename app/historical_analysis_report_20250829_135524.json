@@ -1,0 +1,17 @@
+{
+  "analysis_summary": {
+    "analysis_timestamp": "2025-08-29T13:55:24.787133",
+    "symbols_analyzed": 0,
+    "total_data_points": 0,
+    "regime_distribution": {},
+    "opportunity_summary": {
+      "strategy_counts": {},
+      "total_opportunities": 0,
+      "average_opportunity_score": 0
+    },
+    "top_opportunities": [],
+    "risk_assessment": {}
+  },
+  "regime_analysis": {},
+  "strategy_opportunities": []
+}
