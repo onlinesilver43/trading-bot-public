@@ -11,6 +11,7 @@ ta>=0.10.0
 
 # Database and storage
 # sqlite3 is built-in to Python, no need to install
+pyarrow>=21.0.0
 
 # System monitoring
 psutil>=5.9.0
