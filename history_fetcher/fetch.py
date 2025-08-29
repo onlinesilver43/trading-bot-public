@@ -48,7 +48,7 @@ class BinanceVisionFetcher:
             dir_path.mkdir(exist_ok=True)
         
         # Binance Vision base URL
-        self.base_url = "https://data.binance.vision/api/data"
+        self.base_url = "https://data.binance.vision/data/spot/monthly"
         
         # Supported intervals and symbols
         self.intervals = ["1m", "5m", "15m", "1h", "4h", "1d"]

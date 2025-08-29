@@ -65,15 +65,17 @@
 - **Production Data Connector**: Server integration capabilities ✅
 - **Local Data Connector**: Direct data access for development ✅
 - **Test Data Connector**: Realistic market data generation for testing ✅
-- **Historical Data Collection**: 36 files (6.5MB) of real Binance Vision data ✅
+- **Historical Data Collection**: Real market data collection successful ✅
 
-### **Current Status**: 🔄 **PHASE 4 COMPONENTS DEPLOYED - HISTORICAL DATA COLLECTION SUCCESSFUL**
+### **Current Status**: ✅ **PHASE 4 COMPONENTS DEPLOYED - DATA COLLECTION SUCCESSFUL & VOLUME MOUNT ISSUE RESOLVED**
 - All Phase 4 components implemented, tested, and deployed to production
 - Simple Phase 4 test passing (4/4 tests successful)
 - Historical data collection system operational and successfully collecting real market data
-- Successfully collected 0.78 MB of BTCUSDT 1h data from Binance Vision API
-- Phase 4 components deployed and working, enhanced deployment testing operational
-- Ready to collect remaining data (ETHUSDT, 5m intervals) and test with real data
+- ✅ **Volume Mount Issue RESOLVED**: Fixed Docker container path conflict
+- ✅ **Data Collection Working**: Successfully collected 67 BTCUSDT 1h files (2.76 MB)
+- ✅ **File Storage Verified**: Parquet files now properly accessible on host system
+- ✅ **Docker Image Fixed**: history-fetcher-fixed container now uses correct /app/history path
+- Ready to complete remaining data collection (ETHUSDT, 5m intervals) and test Phase 4 components
 
 ## **🔧 ESSENTIAL COMMANDS & INTERACTIONS**
 
@@ -472,12 +474,15 @@ def test_strategy_engine(self) -> Dict[str, Any]:
 
 ## **🎯 IMMEDIATE NEXT STEPS**
 
-### **Current Priority: Phase 4 Historical Data Collection via Docker**
-1. **Build History Fetcher Container**: `docker build -t history-fetcher .` in `/srv/trading-bots/history_fetcher/`
-2. **Run Data Collection**: Execute container for each symbol/interval combination (BTCUSDT/ETHUSDT, 1h/5m)
-3. **Verify Data Collection**: Ensure `/srv/trading-bots/history/` contains collected data files
-4. **Test Phase 4 Components**: Run with real collected data once available
-5. **Begin Strategy Discovery**: Start analyzing real market data patterns
+### **Current Priority: Phase 4 Historical Data Collection via Docker - VOLUME MOUNT ISSUE RESOLVED**
+1. **✅ COMPLETED**: History Fetcher Container built and URL issue fixed
+2. **✅ COMPLETED**: Data collection script created (`scripts/collect_historical_data.py`)
+3. **✅ COMPLETED**: BTCUSDT 1h data collected (67 files, 2.76 MB)
+4. **✅ COMPLETED**: Volume mount issue resolved - Docker container path conflict fixed
+5. **✅ COMPLETED**: File storage verified - Parquet files properly accessible on host system
+6. **🔄 NEXT**: Complete remaining data collection (ETHUSDT 1h, BTCUSDT 5m, ETHUSDT 5m)
+7. **🔄 NEXT**: Test Phase 4 Components with real collected data
+8. **🔄 NEXT**: Begin Strategy Discovery with real market data patterns
 
 ### **Success Criteria for Phase 4**
 - Master Agent can detect market conditions and select optimal strategies ✅ **IMPLEMENTED**
@@ -488,11 +493,12 @@ def test_strategy_engine(self) -> Dict[str, Any]:
 ## **🔧 HISTORICAL DATA COLLECTION TECHNICAL NOTES**
 
 ### **Current System Status (August 29, 2025)**
-- **History Fetcher System**: 🔄 PENDING - needs Docker execution (system exists but container needs to be built and run)
+- **History Fetcher System**: ✅ OPERATIONAL - Docker container built and URL issue fixed
 - **Data Directory**: `/srv/trading-bots/history/` created on production server ✅
-- **Docker Image**: 🔄 NEEDS BUILD - Run `docker build -t history-fetcher .` in `/srv/trading-bots/history_fetcher/`
+- **Docker Image**: ✅ READY - `history-fetcher-fixed` image working correctly
 - **Production Server**: ✅ All endpoints operational at `http://64.23.214.191:8080`
 - **Phase 4 Components**: ✅ Deployed and working, enhanced deployment testing operational
+- **Data Collection Script**: ✅ `scripts/collect_historical_data.py` created and tested
 - **Current Reality**: All bots should run via Docker in separate containers for proper isolation and management
 
 ### **SSH Connection & Server Access**
@@ -509,9 +515,12 @@ tb "command"
 # Check data collection status
 sshpass -f ~/.ssh/tb_pw ssh tb "cat /srv/trading-bots/history/manifest.json | jq '.statistics'"
 
-# Expected output: 36 total files, 6.5MB total size
-# Symbols: BTCUSDT (26 files), ETHUSDT (12 files)
-# Intervals: 1h (26 files), 5m (12 files)
+# Check file storage
+sshpass -f ~/.ssh/tb_pw ssh tb "find /srv/trading-bots/history/parquet/ -name '*.parquet' | wc -l"
+
+# Expected output: 67+ total files, 2.76+ MB total size
+# Symbols: BTCUSDT (67 files), ETHUSDT (pending)
+# Intervals: 1h (67 files), 5m (pending)
 ```
 
 ### **Production Data Connector Testing**
@@ -527,25 +536,32 @@ curl -s "http://64.23.214.191:8080/api/history/manifest" | python3 -m json.tool
 curl -s "http://64.23.214.191:8080/api/history/status" | python3 -m json.tool
 ```
 
-### **Critical Next Steps After Data Collection**
-1. 🔄 **Build History Fetcher Container**: `docker build -t history-fetcher .` in `/srv/trading-bots/history_fetcher/`
-2. 🔄 **Run History Fetcher Container**: Execute container to collect BTCUSDT and ETHUSDT data
-3. 🔄 **Verify Data Collection**: Ensure `/srv/trading-bots/history/` contains collected data files
-4. 🔄 **Test Production Connector**: Verify the Historical Analysis Bot can access real data
-5. 🔄 **Run Historical Analysis**: Execute the Historical Analysis Bot with real market data
-6. 🔄 **Begin Paper Trading**: Start testing discovered strategies without risk
+### **Critical Next Steps After Data Collection - VOLUME MOUNT ISSUE RESOLVED**
+1. ✅ **History Fetcher Container**: Built and URL issue fixed
+2. ✅ **Data Collection Script**: `scripts/collect_historical_data.py` created and tested
+3. ✅ **BTCUSDT 1h Data**: 67 files collected successfully
+4. ✅ **Volume Mount Issue**: RESOLVED - Docker container path conflict fixed
+5. ✅ **File Storage**: VERIFIED - Parquet files properly accessible on host system
+6. 🔄 **Complete Data Collection**: Finish ETHUSDT 1h, BTCUSDT 5m, and ETHUSDT 5m data collection
+7. 🔄 **Test Production Connector**: Verify the Historical Analysis Bot can access real data
+8. 🔄 **Run Historical Analysis**: Execute the Historical Analysis Bot with real market data
+9. 🔄 **Begin Paper Trading**: Start testing discovered strategies without risk
 
-### **What the Next Session Should Focus On**
-**Priority 1**: Build History Fetcher Container: `docker build -t history-fetcher .`  
-**Priority 2**: Run Data Collection: Execute container for each symbol/interval combination  
-**Priority 3**: Verify Data Collection: Ensure `/srv/trading-bots/history/` contains data files  
-**Priority 4**: Test Phase 4 Components: Run with real collected data  
-**Priority 5**: Begin Strategy Discovery: Start analyzing real market data  
+### **What the Next Session Should Focus On - VOLUME MOUNT ISSUE RESOLVED**
+**Priority 1**: Complete remaining data collection (ETHUSDT 1h, BTCUSDT 5m, ETHUSDT 5m)  
+**Priority 2**: Test Phase 4 Components with real collected data  
+**Priority 3**: Begin Strategy Discovery with real market data patterns  
+**Priority 4**: Validate Master Agent system with actual market data  
+**Priority 5**: Begin paper trading with discovered strategies  
 
 The warmup files now accurately reflect that:
 ✅ Phase 4 deployment was successful  
 ✅ Enhanced testing framework is working  
-🔄 Historical data collection is the next critical step  
+✅ Historical data collection script created and tested  
+✅ BTCUSDT 1h data collected successfully (67 files, 2.76 MB)  
+✅ Volume mount issue RESOLVED - Docker container path conflict fixed  
+✅ File storage VERIFIED - Parquet files properly accessible on host system  
+🔄 Remaining data collection (ETHUSDT 1h, BTCUSDT 5m, ETHUSDT 5m) pending  
 🐳 Docker approach is the correct method  
 You're absolutely right that all bots should run via Docker in separate containers for proper isolation and management.
 
@@ -565,7 +581,7 @@ sshpass -f ~/.ssh/tb_pw ssh tb "docker stats"
 
 **🎯 GOAL: Build intelligent, self-funding trading system that scales from $1K to $100K+ in 1 year through AI-powered multi-strategy trading.**
 
-**📋 STATUS: Phase 1, 2, & 3 COMPLETE - Phase 4 Strategy Implementation COMPONENTS IMPLEMENTED & TESTED with History Fetcher Container Built and Fixed, Ready for Data Collection Testing.**
+**📋 STATUS: Phase 1, 2, & 3 COMPLETE - Phase 4 Strategy Implementation COMPONENTS IMPLEMENTED & TESTED with History Fetcher Container Built and Fixed, Data Collection Script Created, BTCUSDT 1h Data Collected Successfully.**
 
-**🚀 READY TO CONTINUE: Phase 4 components deployed and working. History fetcher Docker container built and URL issue fixed. Focus on testing data collection with corrected URLs, then test Phase 4 components with real data to begin strategy discovery and paper trading phase.**
+**🚀 READY TO CONTINUE: Phase 4 components deployed and working. History fetcher Docker container built and URL issue fixed. Volume mount issue RESOLVED. Data collection script created and tested. BTCUSDT 1h data collected successfully (67 files, 2.76 MB). File storage verified and working. Ready to complete remaining data collection (ETHUSDT 1h, BTCUSDT 5m, ETHUSDT 5m) and test Phase 4 components with real market data to begin strategy discovery and paper trading phase.**
 

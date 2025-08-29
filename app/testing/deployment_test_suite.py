@@ -7,6 +7,7 @@ Tests the reorganized codebase deployment directly using production endpoints
 import requests
 import json
 import time
+import subprocess
 from datetime import datetime
 from typing import Dict, Any, List
 
@@ -74,6 +75,106 @@ class DeploymentTester:
             result["error"] = str(e)
             
         return result
+
+    def test_container_status(self) -> Dict[str, Any]:
+        """Test container status and configuration"""
+        print("\n🐳 Testing Container Status...")
+        
+        container_results = {
+            "bot_container": {"status": "not_tested", "error": None, "details": {}},
+            "ui_container": {"status": "not_tested", "error": None, "details": {}},
+            "history_fetcher": {"status": "not_tested", "error": None, "details": {}}
+        }
+        
+        try:
+            # Test 1: Bot Container Status
+            print("  🤖 Testing Bot Container...")
+            bot_cmd = 'sshpass -f ~/.ssh/tb_pw ssh tb "docker ps --format \\"{{.Names}}\\t{{.Image}}\\t{{.Status}}\\" | grep tb-bot-1"'
+            bot_result = subprocess.run(bot_cmd, shell=True, capture_output=True, text=True)
+            
+            if bot_result.returncode == 0 and bot_result.stdout.strip():
+                container_results["bot_container"]["status"] = "success"
+                container_results["bot_container"]["details"] = {
+                    "name": "tb-bot-1",
+                    "status": "running",
+                    "output": bot_result.stdout.strip()
+                }
+                print("    ✅ Bot container running")
+            else:
+                container_results["bot_container"]["status"] = "error"
+                container_results["bot_container"]["error"] = "Bot container not found or not running"
+                print("    ❌ Bot container not running")
+            
+            # Test 2: UI Container Status
+            print("  🖥️  Testing UI Container...")
+            ui_cmd = 'sshpass -f ~/.ssh/tb_pw ssh tb "docker ps --format \\"{{.Names}}\\t{{.Image}}\\t{{.Status}}\\" | grep tb-ui-1"'
+            ui_result = subprocess.run(ui_cmd, shell=True, capture_output=True, text=True)
+            
+            if ui_result.returncode == 0 and ui_result.stdout.strip():
+                container_results["ui_container"]["status"] = "success"
+                container_results["ui_container"]["details"] = {
+                    "name": "tb-ui-1",
+                    "status": "running",
+                    "output": ui_result.stdout.strip()
+                }
+                print("    ✅ UI container running")
+            else:
+                container_results["ui_container"]["status"] = "error"
+                container_results["ui_container"]["error"] = "UI container not found or not running"
+                print("    ❌ UI container not running")
+            
+            # Test 3: History Fetcher Status
+            print("  📊 Testing History Fetcher...")
+            history_cmd = 'sshpass -f ~/.ssh/tb_pw ssh tb "docker ps -a | grep history-fetcher || echo \\"No history fetcher containers found\\""'
+            history_result = subprocess.run(history_cmd, shell=True, capture_output=True, text=True)
+            
+            if "No history fetcher containers found" in history_result.stdout:
+                container_results["history_fetcher"]["status"] = "warning"
+                container_results["history_fetcher"]["error"] = "History fetcher container not running"
+                container_results["history_fetcher"]["details"] = {
+                    "status": "not_running",
+                    "note": "Container exists but not currently running"
+                }
+                print("    ⚠️  History fetcher container not running")
+            elif history_result.stdout.strip():
+                container_results["history_fetcher"]["status"] = "success"
+                container_results["history_fetcher"]["details"] = {
+                    "status": "running",
+                    "output": history_result.stdout.strip()
+                }
+                print("    ✅ History fetcher container running")
+            else:
+                container_results["history_fetcher"]["status"] = "error"
+                container_results["history_fetcher"]["error"] = "History fetcher status unknown"
+                print("    ❌ History fetcher status unknown")
+            
+            # Test 4: Container Configuration
+            print("  ⚙️  Testing Container Configuration...")
+            config_cmd = 'sshpass -f ~/.ssh/tb_pw ssh tb "echo \\"--- Bot Config ---\\"; head -n 5 /srv/trading-bots/data/bot_config.json 2>/dev/null || echo \\"Config not found\\""'
+            config_result = subprocess.run(config_cmd, shell=True, capture_output=True, text=True)
+            
+            if "Config not found" not in config_result.stdout:
+                print("    ✅ Bot configuration accessible")
+            else:
+                print("    ⚠️  Bot configuration not accessible")
+            
+        except Exception as e:
+            print(f"    ❌ Container testing error: {str(e)}")
+            for container in container_results:
+                if container_results[container]["status"] == "not_tested":
+                    container_results[container]["status"] = "error"
+                    container_results[container]["error"] = f"Testing error: {str(e)}"
+        
+        return {
+            "status": "completed",
+            "containers": container_results,
+            "summary": {
+                "tested": sum(1 for c in container_results.values() if c["status"] != "not_tested"),
+                "success": sum(1 for c in container_results.values() if c["status"] == "success"),
+                "warning": sum(1 for c in container_results.values() if c["status"] == "warning"),
+                "error": sum(1 for c in container_results.values() if c["status"] == "error")
+            }
+        }
     
     def test_all_endpoints(self) -> Dict[str, Any]:
         """Test all endpoints and return comprehensive results"""
@@ -166,6 +267,31 @@ class DeploymentTester:
                     print(f"    └─ {result['error']}")
             
             print(f"\n📊 Phase 4 Summary: {phase4['summary']['success']}✅ {phase4['summary']['warning']}⚠️ {phase4['summary']['error']}❌")
+        
+        # Print container status results if available
+        if 'container_status' in summary and summary['container_status']['status'] == 'completed':
+            print()
+            print("🐳 CONTAINER STATUS RESULTS:")
+            print("-" * 60)
+            containers = summary['container_status']
+            for container, result in containers['containers'].items():
+                if result['status'] == 'success':
+                    status_icon = "✅"
+                elif result['status'] == 'warning':
+                    status_icon = "⚠️"
+                elif result['status'] == 'error':
+                    status_icon = "❌"
+                else:
+                    status_icon = "⏸️"
+                
+                print(f"{status_icon} {container:<20} {result['status']:<15}")
+                if result['error']:
+                    print(f"    └─ {result['error']}")
+                if result['details']:
+                    for key, value in result['details'].items():
+                        print(f"        {key}: {value}")
+            
+            print(f"\n📊 Container Summary: {containers['summary']['success']}✅ {containers['summary']['warning']}⚠️ {containers['summary']['error']}❌")
         
         print()
         print("=" * 60)
@@ -317,6 +443,10 @@ class DeploymentTester:
         # Test Phase 4 components
         phase4_test = self.test_phase4_components()
         summary["phase4_components"] = phase4_test
+
+        # Test container status
+        container_test = self.test_container_status()
+        summary["container_status"] = container_test
         
         # Print summary
         self.print_summary(summary)
