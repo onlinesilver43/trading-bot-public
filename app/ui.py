@@ -5,8 +5,6 @@ import zipfile
 from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
-from app.ui_helpers import load_json, zip_dirs
-
 # --- Paths (containers get these via compose env) ---
 DATA_DIR = os.getenv("DATA_DIR", "/data")
 STATE_PATH = os.getenv("STATE_PATH", os.path.join(DATA_DIR, "paper_state.json"))
