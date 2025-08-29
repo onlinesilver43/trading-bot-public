@@ -1,0 +1,163 @@
+name: History Fetch (On-Demand)
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbol:
+        description: 'Trading symbol (e.g., BTCUSDT, ETHUSDT)'
+        required: true
+        default: 'BTCUSDT'
+        type: string
+      interval:
+        description: 'Time interval (1m, 5m, 15m, 1h, 4h, 1d)'
+        required: true
+        default: '5m'
+        type: string
+      from_date:
+        description: 'Start date (YYYY-MM format)'
+        required: true
+        default: '2019-01'
+        type: string
+      to_date:
+        description: 'End date (YYYY-MM format)'
+        required: true
+        default: '2025-08'
+        type: string
+      fill_daily:
+        description: 'Fill gaps with daily data'
+        required: false
+        default: false
+        type: boolean
+      force:
+        description: 'Force re-download existing files'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  fetch-history:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build History Fetcher Image
+        run: |
+          cd history_fetcher
+          docker build -t history-fetcher:latest .
+
+      - name: Upload Image to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          source: "history_fetcher/"
+          target: "/tmp/history-fetcher"
+
+      - name: Deploy and Run History Fetcher
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+            
+            echo "=== HISTORY FETCHER DEPLOYMENT ==="
+            
+            # Build the image on the server
+            cd /tmp/history-fetcher
+            docker build -t history-fetcher:latest .
+            
+            # Create history directory if it doesn't exist
+            mkdir -p /srv/trading-bots/history
+            
+            # Run the history fetcher
+            echo "Starting history fetcher with parameters:"
+            echo "Symbol: ${{ github.event.inputs.symbol }}"
+            echo "Interval: ${{ github.event.inputs.interval }}"
+            echo "From: ${{ github.event.inputs.from_date }}"
+            echo "To: ${{ github.event.inputs.to_date }}"
+            echo "Fill Daily: ${{ github.event.inputs.fill_daily }}"
+            echo "Force: ${{ github.event.inputs.force }}"
+            
+            # Build command
+            CMD="docker run --rm -v /srv/trading-bots/history:/srv/trading-bots/history history-fetcher:latest"
+            CMD="$CMD --symbol ${{ github.event.inputs.symbol }}"
+            CMD="$CMD --interval ${{ github.event.inputs.interval }}"
+            CMD="$CMD --from ${{ github.event.inputs.from_date }}"
+            CMD="$CMD --to ${{ github.event.inputs.to_date }}"
+            
+            if [ "${{ github.event.inputs.fill_daily }}" = "true" ]; then
+              CMD="$CMD --fill-daily"
+            fi
+            
+            if [ "${{ github.event.inputs.force }}" = "true" ]; then
+              CMD="$CMD --force"
+            fi
+            
+            echo "Executing: $CMD"
+            
+            # Run the fetcher
+            $CMD
+            
+            echo "=== HISTORY FETCHER COMPLETED ==="
+
+      - name: Verify Data Collection
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+            
+            echo "=== VERIFYING DATA COLLECTION ==="
+            
+            HISTORY_DIR="/srv/trading-bots/history"
+            
+            if [ -d "$HISTORY_DIR" ]; then
+              echo "History directory exists"
+              
+              # Check manifest
+              if [ -f "$HISTORY_DIR/manifest.json" ]; then
+                echo "Manifest file exists"
+                echo "Manifest contents:"
+                cat "$HISTORY_DIR/manifest.json" | jq '.statistics' || echo "Failed to parse manifest"
+              else
+                echo "No manifest file found"
+              fi
+              
+              # Check directory structure
+              echo "Directory structure:"
+              find "$HISTORY_DIR" -type d | head -20
+              
+              # Check file counts
+              echo "File counts:"
+              echo "Raw files: $(find $HISTORY_DIR/raw -name '*.zip' 2>/dev/null | wc -l)"
+              echo "CSV files: $(find $HISTORY_DIR/csv -name '*.csv' 2>/dev/null | wc -l)"
+              echo "Parquet files: $(find $HISTORY_DIR/parquet -name '*.parquet' 2>/dev/null | wc -l)"
+              
+              # Check disk usage
+              echo "Disk usage:"
+              du -sh "$HISTORY_DIR"/*
+              
+            else
+              echo "History directory not found"
+            fi
+            
+            echo "=== VERIFICATION COMPLETE ==="
+
+      - name: Cleanup Temporary Files
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            echo "Cleaning up temporary files..."
+            rm -rf /tmp/history-fetcher
+            echo "Cleanup complete"
