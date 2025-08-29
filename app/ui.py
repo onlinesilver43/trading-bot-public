@@ -5,14 +5,14 @@ import zipfile
 from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
+from app.ui_helpers import load_json, zip_dirs
+
 # --- Paths (containers get these via compose env) ---
 DATA_DIR = os.getenv("DATA_DIR", "/data")
 STATE_PATH = os.getenv("STATE_PATH", os.path.join(DATA_DIR, "paper_state.json"))
 TRADES_PATH = os.getenv("TRADES_PATH", os.path.join(DATA_DIR, "paper_trades.json"))
 HOST_APP = os.getenv("HOST_APP", "/host_app")  # /srv/trading-bots/app (ro)
-HOST_COMPOSE = os.getenv(
-    "HOST_COMPOSE", "/host_compose"
-)  # /srv/trading-bots/compose (ro)
+HOST_COMPOSE = os.getenv("HOST_COMPOSE", "/host_compose")  # /srv/trading-bots/compose (ro)
 HOST_GITHUB = os.getenv("HOST_GITHUB", "/host_github")  # /srv/trading-bots/.github (ro)
 
 DIAG_FILES = [
@@ -236,3 +236,250 @@ def api_retains_total():
     except Exception:
         total = 0
     return {"retains_total": int(total)}
+
+
+# --- NEW: Enhanced Infrastructure & Deployment Management ---
+
+@app.get("/api/system/health")
+def api_system_health():
+    """Get comprehensive system health status"""
+    import subprocess
+    import psutil
+    
+    try:
+        # Container status
+        docker_status = {}
+        try:
+            result = subprocess.run(
+                ["docker", "ps", "--format", "{{.Names}},{{.Image}},{{.Status}}"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                for line in result.stdout.strip().split('\n'):
+                    if line:
+                        name, image, status = line.split(',', 2)
+                        docker_status[name] = {"image": image, "status": status}
+        except Exception as e:
+            docker_status = {"error": str(e)}
+        
+        # System resources
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        cpu_percent = psutil.cpu_percent(interval=1)
+        
+        # API health checks
+        api_health = {}
+        try:
+            # Test bot API
+            import requests
+            response = requests.get("http://127.0.0.1:8080/api/state", timeout=5)
+            api_health["bot_api"] = {"status": "healthy", "response_time": response.elapsed.total_seconds()}
+        except Exception as e:
+            api_health["bot_api"] = {"status": "unhealthy", "error": str(e)}
+        
+        return JSONResponse({
+            "timestamp": psutil.boot_time(),
+            "system": {
+                "cpu_percent": cpu_percent,
+                "memory": {
+                    "total": memory.total,
+                    "available": memory.available,
+                    "percent": memory.percent
+                },
+                "disk": {
+                    "total": disk.total,
+                    "used": disk.used,
+                    "free": disk.free,
+                    "percent": disk.percent
+                }
+            },
+            "containers": docker_status,
+            "api_health": api_health,
+            "status": "healthy" if docker_status and not any("error" in str(v) for v in docker_status.values()) else "degraded"
+        })
+    except Exception as e:
+        return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
+
+
+@app.get("/api/system/deployments")
+def api_deployments():
+    """Get deployment history and available rollbacks"""
+    try:
+        backup_dir = "/srv/trading-bots-backups"
+        deployments = []
+        
+        if os.path.exists(backup_dir):
+            for item in os.listdir(backup_dir):
+                item_path = os.path.join(backup_dir, item)
+                if os.path.isdir(item_path):
+                    stat = os.stat(item_path)
+                    deployments.append({
+                        "name": item,
+                        "created": stat.st_mtime,
+                        "size": sum(os.path.getsize(os.path.join(dirpath, filename))
+                                  for dirpath, dirnames, filenames in os.walk(item_path)
+                                  for filename in filenames)
+                    })
+        
+        # Sort by creation time (newest first)
+        deployments.sort(key=lambda x: x["created"], reverse=True)
+        
+        return JSONResponse({
+            "deployments": deployments,
+            "current": {
+                "branch": os.getenv("GIT_BRANCH", "unknown"),
+                "commit": os.getenv("GIT_SHA", "unknown"),
+                "deploy_tag": os.getenv("DEPLOY_TAG", "unknown")
+            }
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/system/rollback/{backup_name}")
+def api_rollback(backup_name: str):
+    """Initiate rollback to specific backup (read-only endpoint)"""
+    try:
+        backup_dir = "/srv/trading-bots-backups"
+        backup_path = os.path.join(backup_dir, backup_name)
+        
+        if not os.path.exists(backup_path):
+            raise HTTPException(404, f"Backup {backup_name} not found")
+        
+        # Return backup info (actual rollback done via GitHub Actions)
+        stat = os.stat(backup_path)
+        return JSONResponse({
+            "backup_name": backup_name,
+            "exists": True,
+            "created": stat.st_mtime,
+            "size": sum(os.path.getsize(os.path.join(dirpath, filename))
+                      for dirpath, dirnames, filenames in os.walk(backup_path)
+                      for filename in filenames),
+            "rollback_instructions": "Use GitHub Actions 'Rollback Deployment' workflow with this backup name"
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/system/resources")
+def api_resources():
+    """Get detailed system resource usage"""
+    try:
+        import psutil
+        
+        # Memory details
+        memory = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+        
+        # Disk details
+        disk = psutil.disk_usage('/')
+        
+        # Network details
+        network = psutil.net_io_counters()
+        
+        # Process details
+        processes = []
+        for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
+            try:
+                processes.append(proc.info)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        
+        # Sort by CPU usage
+        processes.sort(key=lambda x: x.get('cpu_percent', 0) or 0, reverse=True)
+        
+        return JSONResponse({
+            "memory": {
+                "total": memory.total,
+                "available": memory.available,
+                "used": memory.used,
+                "percent": memory.percent,
+                "swap_total": swap.total,
+                "swap_used": swap.used
+            },
+            "disk": {
+                "total": disk.total,
+                "used": disk.used,
+                "free": disk.free,
+                "percent": disk.percent
+            },
+            "network": {
+                "bytes_sent": network.bytes_sent,
+                "bytes_recv": network.bytes_recv,
+                "packets_sent": network.packets_sent,
+                "packets_recv": network.packets_recv
+            },
+            "top_processes": processes[:10]  # Top 10 by CPU usage
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/deployment", response_class=HTMLResponse)
+def deployment_page():
+    """Enhanced deployment management dashboard"""
+    html = """<!doctype html>
+    <html>
+    <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width,initial-scale=1"/>
+        <title>Deployment Management</title>
+        <style>
+            body { font: 14px system-ui; margin: 20px; }
+            .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+            .status-healthy { color: green; }
+            .status-degraded { color: orange; }
+            .status-error { color: red; }
+            table { border-collapse: collapse; width: 100%; }
+            td, th { padding: 8px 12px; border: 1px solid #ccc; text-align: left; }
+            .button { background: #007cba; color: white; padding: 8px 16px; border: none; border-radius: 3px; cursor: pointer; }
+            .button:hover { background: #005a87; }
+            .refresh { float: right; }
+        </style>
+        <script>
+            function refreshData() {
+                location.reload();
+            }
+            
+            function checkHealth() {
+                fetch('/api/system/health')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('health-status').textContent = data.status;
+                        document.getElementById('health-status').className = 'status-' + data.status;
+                    });
+            }
+        </script>
+    </head>
+    <body>
+        <h1>Deployment Management Dashboard</h1>
+        <button class="button refresh" onclick="refreshData()">Refresh</button>
+        
+        <div class="section">
+            <h2>System Health</h2>
+            <p>Status: <span id="health-status" class="status-healthy">Loading...</span></p>
+            <button class="button" onclick="checkHealth()">Check Health</button>
+            <p><a href="/api/system/health">View Full Health Data</a></p>
+        </div>
+        
+        <div class="section">
+            <h2>Deployment Status</h2>
+            <p><a href="/api/system/deployments">View Deployment History</a></p>
+            <p><a href="/api/system/resources">View System Resources</a></p>
+        </div>
+        
+        <div class="section">
+            <h2>Quick Actions</h2>
+            <p><a href="/">← Back to Main Dashboard</a></p>
+            <p><a href="/exports">View Exports</a></p>
+        </div>
+        
+        <script>
+            // Auto-check health on page load
+            checkHealth();
+        </script>
+    </body>
+    </html>"""
+    return HTMLResponse(html)

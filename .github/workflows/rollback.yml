@@ -1,31 +1,134 @@
-name: Rollback
+name: Rollback Deployment
+
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Deploy tag to redeploy (deploy-YYYYMMDD-HHMM-<sha>)"
+      backup_name:
+        description: 'Backup name to rollback to (e.g., backup-20250828-2350-abc123)'
         required: true
-concurrency:
-  group: deploy-prod
-  cancel-in-progress: true
+        type: string
+      confirm_rollback:
+        description: 'Type "ROLLBACK" to confirm'
+        required: true
+        type: string
+
 jobs:
-  redeploy:
+  rollback:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-        with: { ref: ${{ inputs.tag }} }
-      - name: Redeploy tag
-        env:
-          TB_HOST: ${{ secrets.TB_HOST }}
-          TB_PW:   ${{ secrets.TB_PW }}
+      - name: Validate Rollback Confirmation
         run: |
-          sudo apt-get update -y && sudo apt-get install -y sshpass
-          sshpass -p "$TB_PW" ssh -o StrictHostKeyChecking=no "$TB_HOST" "bash -s" <<'SH'
-          set -euo pipefail
-          cd /srv/trading-bots
-          git fetch --all --tags --prune
-          git checkout -f "${ROLLBACK_TAG}"
-          docker compose -p tb -f compose/docker-compose.yml up -d --build --remove-orphans
-          SH
-        env:
-          ROLLBACK_TAG: ${{ inputs.tag }}
+          if [ "${{ github.event.inputs.confirm_rollback }}" != "ROLLBACK" ]; then
+            echo "Error: Must type 'ROLLBACK' to confirm"
+            exit 1
+          fi
+          echo "Rollback confirmed"
+
+      - name: Rollback to Backup
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+            
+            BACKUP_NAME="${{ github.event.inputs.backup_name }}"
+            LIVE=/srv/trading-bots
+            BACKUP_DIR=/srv/trading-bots-backups
+            BACKUP_PATH="$BACKUP_DIR/$BACKUP_NAME"
+            
+            echo "=== ROLLBACK START ==="
+            echo "Rolling back to: $BACKUP_NAME"
+            
+            # Verify backup exists
+            if [ ! -d "$BACKUP_PATH" ]; then
+              echo "Error: Backup $BACKUP_NAME not found"
+              echo "Available backups:"
+              ls -la "$BACKUP_DIR"
+              exit 1
+            fi
+            
+            echo "Backup found, proceeding with rollback..."
+            
+            # Stop current services
+            echo "--- Stopping Current Services ---"
+            BASE="$LIVE/compose/docker-compose.yml"
+            OVR="$LIVE/compose/docker-compose.override.yml"
+            
+            if [ -f "$OVR" ]; then
+              docker compose -p tb -f "$BASE" -f "$OVR" down --remove-orphans || true
+            else
+              docker compose -p tb -f "$BASE" down --remove-orphans || true
+            fi
+            
+            # Backup current failed deployment
+            TIMESTAMP=$(date -u +%Y%m%d-%H%M%S)
+            FAILED_BACKUP="failed-deployment-$TIMESTAMP"
+            echo "Backing up failed deployment as: $FAILED_BACKUP"
+            
+            if [ -d "$LIVE" ]; then
+              rsync -a --exclude data --exclude logs --exclude .env \
+                "$LIVE/" "$BACKUP_DIR/$FAILED_BACKUP/"
+            fi
+            
+            # Restore from backup
+            echo "--- Restoring from Backup ---"
+            rsync -a --delete --exclude data --exclude logs --exclude .env \
+              "$BACKUP_PATH/" "$LIVE/"
+            
+            # Restore .env file (preserve API keys)
+            if [ -f "$LIVE/.env" ]; then
+              echo "Preserving existing .env file"
+            else
+              echo "Creating .env file from backup"
+              cp "$BACKUP_PATH/.env" "$LIVE/.env" 2>/dev/null || echo "No .env in backup"
+            fi
+            
+            # Start services
+            echo "--- Starting Services ---"
+            if [ -f "$OVR" ]; then
+              docker compose -p tb -f "$BASE" -f "$OVR" up -d --build --remove-orphans
+            else
+              docker compose -p tb -f "$BASE" up -d --build --remove-orphans
+            fi
+            
+            # Wait for services to start
+            sleep 30
+            
+            # Verify rollback
+            echo "--- Verifying Rollback ---"
+            echo "Container Status:"
+            docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+            
+            echo "API Health:"
+            curl -sS -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:8080/api/state || echo "FAILED"
+            
+            echo "=== ROLLBACK COMPLETE ==="
+            echo "Successfully rolled back to: $BACKUP_NAME"
+            echo "Failed deployment backed up as: $FAILED_BACKUP"
+
+      - name: Rollback Verification
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+            
+            echo "=== ROLLBACK VERIFICATION ==="
+            
+            # Final health check
+            echo "--- Final Health Check ---"
+            docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+            
+            echo "--- System Resources ---"
+            free -h
+            df -h
+            
+            echo "--- API Endpoints ---"
+            curl -sS http://127.0.0.1:8080/api/state | jq '.state | {profile,timeframe,last_action,last_signal,cash_usd,stash_coin_units,equity_usd,skip_reason}' || echo "API check failed"
+            
+            echo "=== VERIFICATION COMPLETE ==="

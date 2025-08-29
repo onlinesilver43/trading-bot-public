@@ -75,3 +75,84 @@ jobs:
             else
               docker compose -p tb -f "$BASE" up -d --build --remove-orphans
             fi
+
+      - name: Health Check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+            
+            echo "=== HEALTH CHECK START ==="
+            
+            # Wait for services to start
+            sleep 30
+            
+            # Check if containers are running
+            echo "--- Container Status ---"
+            docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+            
+            # Check container health
+            echo "--- Container Health ---"
+            for container in $(docker ps --format "{{.Names}}"); do
+              health=$(docker inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "no-health-check")
+              echo "$container: $health"
+            done
+            
+            # Check API endpoints
+            echo "--- API Health Check ---"
+            echo "Bot Status:"
+            curl -sS -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:8080/api/state || echo "FAILED"
+            
+            echo "UI Health:"
+            curl -sS -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:8080/ || echo "FAILED"
+            
+            # Check system resources
+            echo "--- System Resources ---"
+            echo "Memory:"
+            free -h
+            echo "Disk:"
+            df -h
+            echo "CPU Load:"
+            uptime
+            
+            echo "=== HEALTH CHECK COMPLETE ==="
+
+      - name: Rollback Preparation
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+            
+            LIVE=/srv/trading-bots
+            BACKUP_DIR=/srv/trading-bots-backups
+            
+            # Create backup directory
+            mkdir -p "$BACKUP_DIR"
+            
+            # Create timestamped backup of current deployment
+            TIMESTAMP=$(date -u +%Y%m%d-%H%M%S)
+            BACKUP_NAME="backup-$TIMESTAMP-${{ github.sha }}"
+            
+            echo "Creating backup: $BACKUP_NAME"
+            
+            # Backup current deployment (excluding data/logs)
+            if [ -d "$LIVE" ]; then
+              rsync -a --exclude data --exclude logs --exclude .env \
+                "$LIVE/" "$BACKUP_DIR/$BACKUP_NAME/"
+              
+              # Keep only last 5 backups
+              cd "$BACKUP_DIR"
+              ls -t | tail -n +6 | xargs -r rm -rf
+              
+              echo "Backup created: $BACKUP_NAME"
+              echo "Available rollback backups:"
+              ls -la "$BACKUP_DIR"
+            else
+              echo "No current deployment to backup"
+            fi
