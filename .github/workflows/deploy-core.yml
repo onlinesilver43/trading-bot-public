@@ -1,0 +1,127 @@
+name: Deploy Core Trading System
+
+on:
+  push:
+    branches: [ main ]
+    paths: 
+      - 'app/**'
+      - 'compose/**'
+      - '.env.example'
+      - 'requirements.txt'
+  workflow_dispatch: {}
+
+jobs:
+  deploy-core:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package core components
+        run: |
+          mkdir -p core-package
+          cp -r app core-package/
+          cp -r compose core-package/
+          cp requirements.txt core-package/ 2>/dev/null || true
+          cp .env.example core-package/ 2>/dev/null || true
+          tar -czf core-package.tgz core-package/
+
+      - name: Upload core package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          source: "core-package.tgz"
+          target: "/srv/trading-bots-repo"
+
+      - name: Deploy core system
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+
+            LIVE=/srv/trading-bots
+            REPO=/srv/trading-bots-repo
+            mkdir -p "$LIVE" "$REPO"
+
+            cd "$REPO"
+            tar -xzf core-package.tgz
+            rm -f core-package.tgz
+
+            # Update ONLY core components (app, compose, requirements)
+            echo "Updating core trading system components..."
+            
+            # Update app directory
+            if [ -d "$REPO/core-package/app" ]; then
+              rsync -a --delete "$REPO/core-package/app/" "$LIVE/app/"
+              echo "✅ App directory updated"
+            fi
+            
+            # Update compose directory
+            if [ -d "$REPO/core-package/compose" ]; then
+              rsync -a --delete "$REPO/core-package/compose/" "$LIVE/compose/"
+              echo "✅ Compose directory updated"
+            fi
+            
+            # Update requirements if present
+            if [ -f "$REPO/core-package/requirements.txt" ]; then
+              cp "$REPO/core-package/requirements.txt" "$LIVE/"
+              echo "✅ Requirements updated"
+            fi
+
+            # Write .env AFTER updates so --delete won't remove it
+            : > "$LIVE/.env"
+            printf "BINANCE_API_KEY=%s\n" "${{ secrets.BINANCE_API_KEY }}"   >> "$LIVE/.env"
+            printf "BINANCE_API_SECRET=%s\n" "${{ secrets.BINANCE_API_SECRET }}" >> "$LIVE/.env"
+
+            # Build meta for UI banner (/api/meta)
+            echo "GIT_BRANCH=${{ github.ref_name }}" >> "$LIVE/.env"
+            echo "DEPLOY_TAG=${{ github.ref_name }}" >> "$LIVE/.env"
+            echo "GIT_SHA=${{ github.sha }}"         >> "$LIVE/.env"
+
+            # Bring stack down and up with updated compose files
+            BASE="$LIVE/compose/docker-compose.yml"
+            OVR="$LIVE/compose/docker-compose.override.yml"
+
+            echo "Restarting core services..."
+            if [ -f "$OVR" ]; then
+              docker compose -p tb -f "$BASE" -f "$OVR" down --remove-orphans || true
+              docker compose -p tb -f "$BASE" -f "$OVR" up -d --build --remove-orphans
+            else
+              docker compose -p tb -f "$BASE" down --remove-orphans || true
+              docker compose -p tb -f "$BASE" up -d --build --remove-orphans
+            fi
+
+      - name: Core Health Check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+            
+            echo "=== CORE SYSTEM HEALTH CHECK ==="
+            
+            # Wait for services to start
+            sleep 30
+            
+            # Check if containers are running
+            echo "--- Container Status ---"
+            docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+            
+            # Check core API endpoints
+            echo "--- Core API Health Check ---"
+            echo "Bot Status:"
+            curl -sS -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:8080/api/state || echo "FAILED"
+            
+            echo "UI Health:"
+            curl -sS -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:8080/ || echo "FAILED"
+            
+            echo "=== CORE HEALTH CHECK COMPLETE ==="

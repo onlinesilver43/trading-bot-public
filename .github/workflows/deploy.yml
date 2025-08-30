@@ -1,4 +1,4 @@
-name: Deploy to Droplet
+name: Deploy to Droplet (LEGACY - Use separate workflows instead)
 
 on:
   push:
@@ -43,6 +43,7 @@ jobs:
             tar -xzf package.tgz
             rm -f package.tgz
 
+            # ⚠️ LEGACY: This workflow is deprecated - use separate workflows instead
             # Sync repo -> live (preserve data/logs/.env AND all collected data)
             rsync -a --delete --delete-delay --force \
               --exclude data --exclude logs --exclude .env --exclude _diag/ \

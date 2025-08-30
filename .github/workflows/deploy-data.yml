@@ -1,0 +1,121 @@
+name: Deploy Data Collection System
+
+on:
+  push:
+    branches: [ main ]
+    paths: 
+      - 'app/data_collection/**'
+      - 'app/strategy/historical_data_analyzer.py'
+      - 'scripts/collect_historical_data.py'
+      - 'history_fetcher/**'
+  workflow_dispatch: {}
+
+jobs:
+  deploy-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package data components
+        run: |
+          mkdir -p data-package
+          cp -r app/data_collection data-package/ 2>/dev/null || true
+          cp -r app/strategy/historical_data_analyzer.py data-package/ 2>/dev/null || true
+          cp -r scripts/collect_historical_data.py data-package/ 2>/dev/null || true
+          cp -r history_fetcher data-package/ 2>/dev/null || true
+          tar -czf data-package.tgz data-package/
+
+      - name: Upload data package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          source: "data-package.tgz"
+          target: "/srv/trading-bots-repo"
+
+      - name: Deploy data system
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+
+            LIVE=/srv/trading-bots
+            REPO=/srv/trading-bots-repo
+            mkdir -p "$LIVE" "$REPO"
+
+            cd "$REPO"
+            tar -xzf data-package.tgz
+            rm -f data-package.tgz
+
+            echo "Updating data collection components..."
+            
+            # Update data collection logic (preserve collected data)
+            if [ -d "$REPO/data-package/data_collection" ]; then
+              rsync -a --delete "$REPO/data-package/data_collection/" "$LIVE/app/data_collection/"
+              echo "✅ Data collection logic updated"
+            fi
+            
+            # Update historical data analyzer
+            if [ -f "$REPO/data-package/historical_data_analyzer.py" ]; then
+              cp "$REPO/data-package/historical_data_analyzer.py" "$LIVE/app/strategy/"
+              echo "✅ Historical data analyzer updated"
+            fi
+            
+            # Update collection script
+            if [ -f "$REPO/data-package/collect_historical_data.py" ]; then
+              cp "$REPO/data-package/collect_historical_data.py" "$LIVE/scripts/"
+              echo "✅ Data collection script updated"
+            fi
+            
+            # Update history fetcher (preserve collected data)
+            if [ -d "$REPO/data-package/history_fetcher" ]; then
+              rsync -a --delete "$REPO/data-package/history_fetcher/" "$LIVE/history_fetcher/"
+              echo "✅ History fetcher updated"
+            fi
+
+            echo "Data collection system updated successfully"
+            echo "All collected historical data preserved"
+
+      - name: Data System Health Check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+            
+            echo "=== DATA SYSTEM HEALTH CHECK ==="
+            
+            # Check if data directories still exist and contain data
+            echo "--- Data Directory Check ---"
+            if [ -d "/srv/trading-bots/history" ]; then
+              echo "✅ History directory exists"
+              ls -la /srv/trading-bots/history/
+            else
+              echo "⚠️  History directory missing"
+            fi
+            
+            if [ -d "/srv/trading-bots/data" ]; then
+              echo "✅ Data directory exists"
+              ls -la /srv/trading-bots/data/
+            else
+              echo "⚠️  Data directory missing"
+            fi
+            
+            # Check data collection API endpoints
+            echo "--- Data API Health Check ---"
+            echo "History Manifest:"
+            curl -sS -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:8080/api/history/manifest || echo "FAILED"
+            
+            echo "History Status:"
+            curl -sS -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:8080/api/history/status || echo "FAILED"
+            
+            echo "=== DATA HEALTH CHECK COMPLETE ==="

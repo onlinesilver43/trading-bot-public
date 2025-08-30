@@ -1,0 +1,128 @@
+name: Deploy Configuration & Scripts
+
+on:
+  push:
+    branches: [ main ]
+    paths: 
+      - 'config/**'
+      - 'scripts/**'
+      - '.env.example'
+      - 'pytest.ini'
+      - '.pre-commit-config.yaml'
+  workflow_dispatch: {}
+
+jobs:
+  deploy-config:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package config components
+        run: |
+          mkdir -p config-package
+          cp -r config config-package/ 2>/dev/null || true
+          cp -r scripts config-package/ 2>/dev/null || true
+          cp .env.example config-package/ 2>/dev/null || true
+          cp pytest.ini config-package/ 2>/dev/null || true
+          cp .pre-commit-config.yaml config-package/ 2>/dev/null || true
+          tar -czf config-package.tgz config-package/
+
+      - name: Upload config package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          source: "config-package.tgz"
+          target: "/srv/trading-bots-repo"
+
+      - name: Deploy config system
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+
+            LIVE=/srv/trading-bots
+            REPO=/srv/trading-bots-repo
+            mkdir -p "$LIVE" "$REPO"
+
+            cd "$REPO"
+            tar -xzf config-package.tgz
+            rm -f config-package.tgz
+
+            echo "Updating configuration and scripts..."
+            
+            # Update config directory (preserve runtime data)
+            if [ -d "$REPO/config-package/config" ]; then
+              rsync -a --delete "$REPO/config-package/config/" "$LIVE/config/"
+              echo "✅ Configuration directory updated"
+            fi
+            
+            # Update scripts directory (preserve runtime data)
+            if [ -d "$REPO/config-package/scripts" ]; then
+              rsync -a --delete "$REPO/config-package/scripts/" "$LIVE/scripts/"
+              echo "✅ Scripts directory updated"
+            fi
+            
+            # Update individual config files
+            if [ -f "$REPO/config-package/pytest.ini" ]; then
+              cp "$REPO/config-package/pytest.ini" "$LIVE/"
+              echo "✅ pytest.ini updated"
+            fi
+            
+            if [ -f "$REPO/config-package/.pre-commit-config.yaml" ]; then
+              cp "$REPO/config-package/.pre-commit-config.yaml" "$LIVE/"
+              echo "✅ .pre-commit-config.yaml updated"
+            fi
+
+            echo "Configuration and scripts updated successfully"
+            echo "All runtime data preserved"
+
+      - name: Config System Health Check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TB_HOST }}
+          username: ${{ secrets.TB_USER }}
+          password: ${{ secrets.TB_PASS }}
+          script: |
+            set -euo pipefail
+            
+            echo "=== CONFIG SYSTEM HEALTH CHECK ==="
+            
+            # Check if config directories still exist
+            echo "--- Config Directory Check ---"
+            if [ -d "/srv/trading-bots/config" ]; then
+              echo "✅ Config directory exists"
+              ls -la /srv/trading-bots/config/
+            else
+              echo "⚠️  Config directory missing"
+            fi
+            
+            if [ -d "/srv/trading-bots/scripts" ]; then
+              echo "✅ Scripts directory exists"
+              ls -la /srv/trading-bots/scripts/
+            else
+              echo "⚠️  Scripts directory missing"
+            fi
+            
+            # Check if config files are accessible
+            echo "--- Config File Check ---"
+            if [ -f "/srv/trading-bots/pytest.ini" ]; then
+              echo "✅ pytest.ini exists"
+            else
+              echo "⚠️  pytest.ini missing"
+            fi
+            
+            if [ -f "/srv/trading-bots/.pre-commit-config.yaml" ]; then
+              echo "✅ .pre-commit-config.yaml exists"
+            else
+              echo "⚠️  .pre-commit-config.yaml missing"
+            fi
+            
+            echo "=== CONFIG HEALTH CHECK COMPLETE ==="

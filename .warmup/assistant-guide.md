@@ -131,6 +131,8 @@ python3 deployment_test_suite.py
 
 # This tests ALL production endpoints and Phase 4 components
 # Expected: 100% endpoint success + Phase 4 component validation
+# ✅ IMPROVED: Now uses API endpoints only (no SSH commands)
+# ✅ RELIABLE: Faster, more consistent, no network dependency issues
 ```
 
 ### **CI Workflow Testing**

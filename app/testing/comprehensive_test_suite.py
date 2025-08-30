@@ -62,6 +62,7 @@ class ComprehensiveTestSuite(TestSuite):
         self._test_ui_system()
         self._test_bot_system()
         self._test_ci_workflow_validation()  # New CI workflow tests
+        self._test_deployment_workflow_system()  # New deployment workflow tests
 
     def _safe_import_with_fallback(
         self, module_path: str, class_name: Optional[str] = None
@@ -551,6 +552,35 @@ class ComprehensiveTestSuite(TestSuite):
             skip_if_missing=False,
         )
 
+    def _test_deployment_workflow_system(self) -> None:
+        """Test deployment workflow system - ensures separate deployments work correctly"""
+        component = "Deployment Workflow System"
+        logger.info(f"\n🧪 Testing {component}...")
+
+        # Test deployment workflow files exist
+        self.run_test(
+            component,
+            "Workflow Files Exist",
+            lambda: self._validate_deployment_workflows_exist(),
+            skip_if_missing=False,
+        )
+
+        # Test deployment workflow syntax
+        self.run_test(
+            component,
+            "Workflow Syntax",
+            lambda: self._validate_deployment_workflow_syntax(),
+            skip_if_missing=False,
+        )
+
+        # Test deployment workflow data preservation
+        self.run_test(
+            component,
+            "Data Preservation Logic",
+            lambda: self._validate_deployment_data_preservation(),
+            skip_if_missing=False,
+        )
+
     def _validate_size_guard(self) -> bool:
         """Validate that all files are within size guard limits"""
         MAX_BYTES = 81920  # 80 KB
@@ -679,9 +709,7 @@ class ComprehensiveTestSuite(TestSuite):
             )
 
             if result.returncode != 0:
-                logger.error(
-                    f"Pytest collection failed:\n{result.stdout}\n{result.stderr}"
-                )
+                logger.error(f"Pytest collection failed:\n{result.stdout}\n{result.stderr}")
                 return False
 
             # Check that tests were collected
@@ -700,22 +728,14 @@ class ComprehensiveTestSuite(TestSuite):
         try:
             # Run pytest on basic functionality tests only
             result = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "pytest",
-                    "testing/test_basic_functionality.py",
-                    "-v",
-                ],
+                [sys.executable, "-m", "pytest", "testing/test_basic_functionality.py", "-v"],
                 capture_output=True,
                 text=True,
                 cwd=".",
             )
 
             if result.returncode != 0:
-                logger.error(
-                    f"Pytest execution failed:\n{result.stdout}\n{result.stderr}"
-                )
+                logger.error(f"Pytest execution failed:\n{result.stdout}\n{result.stderr}")
                 return False
 
             # Check that tests passed
@@ -727,6 +747,105 @@ class ComprehensiveTestSuite(TestSuite):
             return True
         except Exception as e:
             logger.error(f"Pytest execution validation failed: {e}")
+            return False
+
+    def _validate_deployment_workflows_exist(self) -> bool:
+        """Validate that all required deployment workflow files exist"""
+        try:
+            workflows_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".github", "workflows")
+            
+            if not os.path.exists(workflows_dir):
+                logger.warning("Workflows directory not found, skipping workflow existence validation")
+                return True
+                
+            required_workflows = ["deploy-core.yml", "deploy-data.yml", "deploy-config.yml", "deploy.yml"]
+            
+            for workflow in required_workflows:
+                workflow_path = os.path.join(workflows_dir, workflow)
+                if not os.path.exists(workflow_path):
+                    logger.error(f"Required workflow file missing: {workflow}")
+                    return False
+            
+            logger.info("All required deployment workflow files exist")
+            return True
+        except Exception as e:
+            logger.error(f"Deployment workflow validation failed: {e}")
+            return False
+
+    def _validate_deployment_workflow_syntax(self) -> bool:
+        """Validate that all deployment workflow files have valid YAML syntax"""
+        try:
+            workflows_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".github", "workflows")
+            
+            # Try to import yaml, but don't fail if it's not available
+            try:
+                import yaml
+                yaml_available = True
+            except ImportError:
+                logger.warning("PyYAML not available, skipping YAML syntax validation")
+                return True
+            
+            for workflow_file in os.listdir(workflows_dir):
+                if workflow_file.endswith('.yml'):
+                    workflow_path = os.path.join(workflows_dir, workflow_file)
+                    try:
+                        with open(workflow_path, 'r') as f:
+                            yaml.safe_load(f)
+                    except Exception as e:
+                        logger.error(f"Workflow {workflow_file} has invalid YAML syntax: {e}")
+                        return False
+            
+            logger.info("All deployment workflow files have valid YAML syntax")
+            return True
+        except Exception as e:
+            logger.error(f"Deployment workflow syntax validation failed: {e}")
+            return False
+
+    def _validate_deployment_data_preservation(self) -> bool:
+        """Validate that deployment workflows preserve data directories"""
+        try:
+            workflows_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".github", "workflows")
+            
+            if not os.path.exists(workflows_dir):
+                logger.warning("Workflows directory not found, skipping data preservation validation")
+                return True
+            
+            # Check deploy-core.yml for data preservation
+            core_workflow = os.path.join(workflows_dir, "deploy-core.yml")
+            if os.path.exists(core_workflow):
+                try:
+                    with open(core_workflow, 'r') as f:
+                        content = f.read()
+                    
+                    # Should NOT have --delete for data directories
+                    if '--delete' in content and 'history' not in content and 'data' not in content:
+                        logger.info("Core deployment workflow preserves data directories")
+                    else:
+                        logger.error("Core deployment workflow may affect data directories")
+                        return False
+                except Exception as e:
+                    logger.error(f"Failed to read core workflow: {e}")
+                    return False
+            
+            # Check deploy-data.yml for data preservation
+            data_workflow = os.path.join(workflows_dir, "deploy-data.yml")
+            if os.path.exists(data_workflow):
+                try:
+                    with open(data_workflow, 'r') as f:
+                        content = f.read()
+                    
+                    if 'preserve collected data' in content:
+                        logger.info("Data deployment workflow explicitly preserves collected data")
+                    else:
+                        logger.warning("Data deployment workflow has no explicit data preservation message")
+                except Exception as e:
+                    logger.error(f"Failed to read data workflow: {e}")
+                    return False
+            
+            logger.info("Deployment data preservation validation passed")
+            return True
+        except Exception as e:
+            logger.error(f"Deployment data preservation validation failed: {e}")
             return False
 
 

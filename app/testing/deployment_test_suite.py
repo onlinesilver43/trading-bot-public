@@ -7,7 +7,7 @@ Tests the reorganized codebase deployment directly using production endpoints
 import requests
 import json
 import time
-import subprocess
+
 from datetime import datetime
 from typing import Dict, Any
 
@@ -88,92 +88,86 @@ class DeploymentTester:
         }
 
         try:
-            # Test 1: Bot Container Status
+            # Test 1: Bot Container Status via API health check
             print("  🤖 Testing Bot Container...")
-            bot_cmd = 'sshpass -f ~/.ssh/tb_pw ssh tb "docker ps --format \\"{{.Names}}\\t{{.Image}}\\t{{.Status}}\\" | grep tb-bot-1"'
-            bot_result = subprocess.run(
-                bot_cmd, shell=True, capture_output=True, text=True
-            )
-
-            if bot_result.returncode == 0 and bot_result.stdout.strip():
+            bot_health = self.test_endpoint("system_health", "/api/system/health")
+            
+            if bot_health["status"] == "success" and bot_health["data"]:
                 container_results["bot_container"]["status"] = "success"
                 container_results["bot_container"]["details"] = {
                     "name": "tb-bot-1",
                     "status": "running",
-                    "output": bot_result.stdout.strip(),
+                    "health_status": bot_health["data"].get("status", "unknown"),
+                    "response_time": bot_health["response_time"],
                 }
                 print("    ✅ Bot container running")
             else:
                 container_results["bot_container"]["status"] = "error"
                 container_results["bot_container"][
                     "error"
-                ] = "Bot container not found or not running"
-                print("    ❌ Bot container not running")
+                ] = f"Bot health check failed: {bot_health.get('error')}"
+                print("    ❌ Bot container not responding")
 
-            # Test 2: UI Container Status
+            # Test 2: UI Container Status via API response
             print("  🖥️  Testing UI Container...")
-            ui_cmd = 'sshpass -f ~/.ssh/tb_pw ssh tb "docker ps --format \\"{{.Names}}\\t{{.Image}}\\t{{.Status}}\\" | grep tb-ui-1"'
-            ui_result = subprocess.run(
-                ui_cmd, shell=True, capture_output=True, text=True
-            )
-
-            if ui_result.returncode == 0 and ui_result.stdout.strip():
+            ui_test = self.test_endpoint("home", "/")
+            
+            if ui_test["status"] == "success":
                 container_results["ui_container"]["status"] = "success"
                 container_results["ui_container"]["details"] = {
                     "name": "tb-ui-1",
                     "status": "running",
-                    "output": ui_result.stdout.strip(),
+                    "response_time": ui_test["response_time"],
+                    "content_length": len(ui_test.get("data", "")),
                 }
                 print("    ✅ UI container running")
             else:
                 container_results["ui_container"]["status"] = "error"
                 container_results["ui_container"][
                     "error"
-                ] = "UI container not found or not running"
-                print("    ❌ UI container not running")
+                ] = f"UI endpoint failed: {ui_test.get('error')}"
+                print("    ❌ UI container not responding")
 
-            # Test 3: History Fetcher Status
+            # Test 3: History Fetcher Status via API endpoints
             print("  📊 Testing History Fetcher...")
-            history_cmd = 'sshpass -f ~/.ssh/tb_pw ssh tb "docker ps -a | grep history-fetcher || echo \\"No history fetcher containers found\\""'
-            history_result = subprocess.run(
-                history_cmd, shell=True, capture_output=True, text=True
-            )
-
-            if "No history fetcher containers found" in history_result.stdout:
+            history_manifest = self.test_endpoint("history_manifest", "/api/history/manifest")
+            history_status = self.test_endpoint("history_status", "/api/history/status")
+            
+            if history_manifest["status"] == "success" and history_status["status"] == "success":
+                container_results["history_fetcher"]["status"] = "success"
+                container_results["history_fetcher"]["details"] = {
+                    "status": "operational",
+                    "manifest_endpoint": "working",
+                    "status_endpoint": "working",
+                    "response_time": history_manifest["response_time"],
+                }
+                print("    ✅ History fetcher operational")
+            elif history_manifest["status"] == "success" or history_status["status"] == "success":
                 container_results["history_fetcher"]["status"] = "warning"
                 container_results["history_fetcher"][
                     "error"
-                ] = "History fetcher container not running"
+                ] = "Partial history fetcher functionality"
                 container_results["history_fetcher"]["details"] = {
-                    "status": "not_running",
-                    "note": "Container exists but not currently running",
+                    "status": "partial",
+                    "manifest_working": history_manifest["status"] == "success",
+                    "status_endpoint": "working",
                 }
-                print("    ⚠️  History fetcher container not running")
-            elif history_result.stdout.strip():
-                container_results["history_fetcher"]["status"] = "success"
-                container_results["history_fetcher"]["details"] = {
-                    "status": "running",
-                    "output": history_result.stdout.strip(),
-                }
-                print("    ✅ History fetcher container running")
+                print("    ⚠️  History fetcher partially operational")
             else:
                 container_results["history_fetcher"]["status"] = "error"
                 container_results["history_fetcher"][
                     "error"
-                ] = "History fetcher status unknown"
-                print("    ❌ History fetcher status unknown")
+                ] = "History fetcher endpoints not responding"
+                print("    ❌ History fetcher not operational")
 
-            # Test 4: Container Configuration
+            # Test 4: Container Configuration via API
             print("  ⚙️  Testing Container Configuration...")
-            config_cmd = 'sshpass -f ~/.ssh/tb_pw ssh tb "echo \\"--- Bot Config ---\\"; head -n 5 /srv/trading-bots/data/bot_config.json 2>/dev/null || echo \\"Config not found\\""'
-            config_result = subprocess.run(
-                config_cmd, shell=True, capture_output=True, text=True
-            )
-
-            if "Config not found" not in config_result.stdout:
-                print("    ✅ Bot configuration accessible")
+            system_resources = self.test_endpoint("system_resources", "/api/system/resources")
+            
+            if system_resources["status"] == "success" and system_resources["data"]:
+                print("    ✅ Container configuration accessible via API")
             else:
-                print("    ⚠️  Bot configuration not accessible")
+                print("    ⚠️  Container configuration not accessible via API")
 
         except Exception as e:
             print(f"    ❌ Container testing error: {str(e)}")
@@ -423,12 +417,22 @@ class DeploymentTester:
                 "history_manifest", "/api/history/manifest"
             )
             if history_result["status"] == "success":
-                if (
-                    history_result["data"]
-                    and history_result["data"].get("status") != "no_data"
-                ):
+                manifest_data = history_result.get("data", {})
+                total_files = manifest_data.get("statistics", {}).get("total_files", 0)
+                total_size_mb = manifest_data.get("statistics", {}).get("total_size_bytes", 0)
+                total_size_mb = round(total_size_mb / (1024 * 1024), 2) if total_size_mb > 0 else 0
+                
+                if total_files > 100 and total_size_mb > 10:
                     phase4_results["data_connector"]["status"] = "success"
-                    print("    ✅ Historical data accessible")
+                    print(f"    ✅ Historical data accessible: {total_files} files, {total_size_mb} MB")
+                elif total_files > 0:
+                    phase4_results["data_connector"]["status"] = "warning"
+                    phase4_results["data_connector"][
+                        "error"
+                    ] = f"Limited historical data: {total_files} files, {total_size_mb} MB"
+                    print(
+                        f"    ⚠️  Limited historical data: {total_files} files, {total_size_mb} MB"
+                    )
                 else:
                     phase4_results["data_connector"]["status"] = "warning"
                     phase4_results["data_connector"][
@@ -523,47 +527,39 @@ class DeploymentTester:
     def _test_real_data_access(self) -> Dict[str, Any]:
         """Test access to real collected historical data"""
         try:
-            import subprocess
-            import json
+            print("    🔍 Checking collected data via API...")
 
-            print("    🔍 Checking collected data on server...")
-
-            # Test SSH connection and data access
-            ssh_cmd = "sshpass -f ~/.ssh/tb_pw ssh tb \"cat /srv/trading-bots/history/manifest.json | jq '.statistics'\""
-            result = subprocess.run(ssh_cmd, shell=True, capture_output=True, text=True)
-
-            if result.returncode != 0:
+            # Use the API endpoint instead of SSH
+            manifest_result = self.test_endpoint("history_manifest", "/api/history/manifest")
+            
+            if manifest_result["status"] != "success":
                 return {
                     "status": "error",
-                    "error": f"SSH connection failed: {result.stderr}",
+                    "error": f"History manifest endpoint failed: {manifest_result.get('error')}",
                 }
 
-            try:
-                stats = json.loads(result.stdout)
+            manifest_data = manifest_result.get("data", {})
+            
+            # Check if we have substantial data
+            total_files = manifest_data.get("statistics", {}).get("total_files", 0)
+            total_size_bytes = manifest_data.get("statistics", {}).get("total_size_bytes", 0)
+            total_size_mb = round(total_size_bytes / (1024 * 1024), 2) if total_size_bytes > 0 else 0
+            
+            symbols = list(manifest_data.get("statistics", {}).get("symbols", {}).keys())
+            intervals = list(manifest_data.get("statistics", {}).get("intervals", {}).keys())
 
-                # Check if we have substantial data
-                total_files = stats.get("total_files", 0)
-                total_size_mb = round(
-                    stats.get("total_size_bytes", 0) / (1024 * 1024), 2
-                )
-                symbols = list(stats.get("symbols", {}).keys())
-                intervals = list(stats.get("intervals", {}).keys())
-
-                if total_files > 100 and total_size_mb > 10:
-                    return {
-                        "status": "success",
-                        "details": f"{total_files} files, {total_size_mb} MB, {len(symbols)} symbols, {len(intervals)} intervals",
-                    }
-                elif total_files > 0:
-                    return {
-                        "status": "warning",
-                        "error": f"Limited data: {total_files} files, {total_size_mb} MB",
-                    }
-                else:
-                    return {"status": "error", "error": "No collected data found"}
-
-            except json.JSONDecodeError:
-                return {"status": "error", "error": "Failed to parse manifest data"}
+            if total_files > 100 and total_size_mb > 10:
+                return {
+                    "status": "success",
+                    "details": f"{total_files} files, {total_size_mb} MB, {len(symbols)} symbols, {len(intervals)} intervals",
+                }
+            elif total_files > 0:
+                return {
+                    "status": "warning",
+                    "error": f"Limited data: {total_files} files, {total_size_mb} MB",
+                }
+            else:
+                return {"status": "error", "error": "No collected data found"}
 
         except Exception as e:
             return {"status": "error", "error": f"Real data testing error: {str(e)}"}
