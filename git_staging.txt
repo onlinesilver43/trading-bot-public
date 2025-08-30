@@ -1,0 +1,35 @@
+# Git Staging for Enhanced Test Framework
+# Files to be committed:
+
+## Enhanced Test Framework Files:
+- app/testing/deployment_test_suite.py (enhanced with real data testing)
+- app/simple_phase4_test.py (enhanced with --real-data flag)
+- app/testing/test_phase4_suite.py (enhanced with real data methods)
+- app/test_phase4_integration.py (new comprehensive test runner)
+
+## Core Components:
+- app/strategy/collected_data_connector.py (real data access)
+- scripts/collect_historical_data.py (data collection script)
+- history_fetcher/fetch.py (fixed URL format)
+
+## Configuration:
+- .gitignore (updated to exclude temporary files)
+
+## Warmup Files:
+- .warmup/assistant-guide.md (updated status)
+- .warmup/current-status.md (updated status)
+- .warmup/test.md (updated status)
+- .warmup/goal.txt (updated status)
+- .warmup/interaction_guide.md (updated status)
+- .warmup/plan.md (updated status)
+
+# Commit Message:
+"Enhance test framework with real data testing capabilities
+
+- Add real data access testing to deployment test suite
+- Enhance simple Phase 4 test with real data option (--real-data flag)
+- Add real data testing methods to Phase 4 test suite
+- Create integration test runner for comprehensive Phase 4 testing
+- All tests now support both test data and real collected data
+- Maintain backward compatibility with existing test framework
+- Update warmup files to reflect current status and capabilities"
