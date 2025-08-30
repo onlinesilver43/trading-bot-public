@@ -247,7 +247,7 @@ class SimplePhase4Test:
             logger.info("Testing strategy simulation...")
             
             # Get data for strategy testing
-            btc_data = self.test_data_connector.get_symbol_data("BTCUSDT", "1h", limit=200)
+            btc_data = self.data_connector.get_symbol_data("BTCUSDT", "1h", limit=200)
             
             if btc_data is None or btc_data.empty:
                 return {"status": "error", "error": "Failed to get BTC data for strategy testing"}
