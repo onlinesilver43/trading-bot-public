@@ -33,6 +33,7 @@ services:
       - /srv/trading-bots/app:/host_app:ro
       - /srv/trading-bots/compose:/host_compose:ro
       - /srv/trading-bots/.github:/host_github:ro
+      - /srv/trading-bots/history:/srv/trading-bots/history:ro
     ports:
       - "8080:8080"
     restart: unless-stopped
