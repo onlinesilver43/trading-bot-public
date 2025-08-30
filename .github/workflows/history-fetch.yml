@@ -69,7 +69,7 @@ jobs:
             echo "=== HISTORY FETCHER DEPLOYMENT ==="
             
             # Build the image on the server
-            cd /tmp/history-fetcher
+            cd /tmp/history-fetcher/history_fetcher
             docker build -t history-fetcher:latest .
             
             # Create history directory if it doesn't exist
