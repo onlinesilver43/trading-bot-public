@@ -5,17 +5,25 @@
 - **Deployment**: GitHub Actions → DigitalOcean droplet
 - **Environment**: WSL-friendly, uses GitHub CLI and SSH
 - **Current Phase**: Phase 4 Strategy Implementation (Components Implemented & Tested, All Workflows Passing)
+- **🚨 CRITICAL ISSUE**: History Fetch workflow failed - cannot merge to main until resolved
 
-## **NEW: Strategic Direction - Self-Funding Unlimited Scaling**
+## **🚨 CRITICAL ISSUE: History Functionality Blocking Merge to Main**
 
-### **Current Goal**: Build self-funding, unlimited scaling trading system
-- **Target**: $1K → $50K+ in 1 year through multi-bot, multi-coin trading
-- **Strategy**: Get profitable from day 1, self-fund development
-- **Timeline**: 1-week sprint to complete system, 4 weeks to self-funding
+### **Current Status**: 
+- **Phase 4**: ✅ **COMPLETE** - All components implemented, tested, and validated
+- **Import System**: ✅ **REFACTORED** - Clean ImportResolver class implemented
+- **All Tests**: ✅ **PASSING** - 33/33 tests with 100% success rate
+- **History Functionality**: ❌ **FAILED** - Workflow failed during Docker build on server
+- **Merge Status**: 🚨 **BLOCKED** - Cannot merge to main until history functionality is working
+
+### **Immediate Priority**: Fix History Fetch Workflow
+- **Issue**: Docker build failed with "failed to read dockerfile: open Dockerfile: no such file or directory"
+- **Impact**: No historical data can be collected, blocking deployment testing
+- **Requirement**: Must fix before creating merge request or proceeding to Phase 5
 
 ### **Self-Funding Development Strategy**
 1. **Week 1**: Generate $200+ profit to fund development ✅ **COMPLETE - Phase 4 components built**
-2. **Week 2**: Use profits to build full multi-bot system 🚀 **IN PROGRESS - Production integration**
+2. **Week 2**: Use profits to build full multi-bot system 🚨 **BLOCKED - History functionality must be fixed first**
 3. **Week 3**: Complete AI agent, achieve self-funding
 4. **Week 4+**: Unlimited scaling begins
 
@@ -404,6 +412,44 @@ python3 simple_phase4_test.py
 4. **After changing priorities** - Update plan and immediate next steps
 5. **After adding new features** - Update current status and capabilities
 6. **Before ending session** - Ensure all files reflect current state
+
+---
+
+## **🏗️ REFACTORING PRINCIPLES - CRITICAL FOR ASSISTANTS**
+
+### **ALWAYS REFACTOR, NEVER JUST PATCH**
+**Critical Principle**: When encountering issues in the codebase, always opt for refactoring if it will make the code:
+- **Easier to maintain** - Clean, logical structure
+- **More stable** - Robust error handling and edge cases
+- **Easier to read** - Clear, understandable code
+- **More modular** - Separated concerns and responsibilities
+
+**Examples of Refactoring vs Patching:**
+- ❌ **PATCHING**: Skip failing tests, add try/catch everywhere, comment out problematic code
+- ✅ **REFACTORING**: Create clean import resolvers, restructure modules, implement proper error handling
+
+**Why This Matters**: 
+- Patches create technical debt and make future maintenance harder
+- Refactoring improves the overall codebase quality and developer experience
+- Clean code is easier to debug, test, and extend
+
+### **REFACTORING CHECKLIST:**
+1. **Identify the root cause** of the issue
+2. **Design a clean solution** that improves the codebase
+3. **Implement the solution** with proper error handling
+4. **Test thoroughly** to ensure the refactoring works
+5. **Document the changes** for future developers
+
+### **RECENT REFACTORING EXAMPLE - Import System:**
+**Problem**: Complex, fragile import logic in test suite causing failures
+**❌ Patching Approach**: Skip failing tests, comment out problematic imports
+**✅ Refactoring Approach**: 
+- Created `ImportResolver` class with clean, maintainable import logic
+- Separated import concerns from test logic
+- Implemented multiple import strategies with proper error handling
+- Made the system extensible for future import needs
+
+**Result**: Clean, maintainable import system that can be easily extended and debugged
 
 ---
 

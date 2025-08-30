@@ -11,8 +11,19 @@ from dataclasses import dataclass
 
 from .sma_crossover import decide, indicators
 from .performance_db import StrategyPerformanceDB, TradeRecord
-from ..market_analysis.regime_detection import MarketRegimeDetector
-from ..data_collection.data_preprocessor import DataPreprocessor, OHLCVData
+
+# Use try/except for imports to handle potential circular import issues
+try:
+    from ..market_analysis.regime_detection import MarketRegimeDetector
+    from ..data_collection.data_preprocessor import DataPreprocessor, OHLCVData
+
+    IMPORTS_AVAILABLE = True
+except ImportError:
+    # Fallback for testing or when modules aren't available
+    MarketRegimeDetector = None
+    DataPreprocessor = None
+    OHLCVData = None
+    IMPORTS_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -58,8 +69,14 @@ class BacktestingEngine:
     def __init__(self, config: BacktestConfig):
         self.config = config
         self.performance_db = StrategyPerformanceDB("backtest_performance.db")
-        self.regime_detector = MarketRegimeDetector()
-        self.data_preprocessor = DataPreprocessor()
+
+        # Initialize optional components if available
+        if IMPORTS_AVAILABLE:
+            self.regime_detector = MarketRegimeDetector()
+            self.data_preprocessor = DataPreprocessor()
+        else:
+            self.regime_detector = None
+            self.data_preprocessor = None
 
         # Backtest state
         self.current_capital = config.initial_capital

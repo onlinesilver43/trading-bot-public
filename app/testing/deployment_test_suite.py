@@ -91,7 +91,7 @@ class DeploymentTester:
             # Test 1: Bot Container Status via API health check
             print("  🤖 Testing Bot Container...")
             bot_health = self.test_endpoint("system_health", "/api/system/health")
-            
+
             if bot_health["status"] == "success" and bot_health["data"]:
                 container_results["bot_container"]["status"] = "success"
                 container_results["bot_container"]["details"] = {
@@ -111,7 +111,7 @@ class DeploymentTester:
             # Test 2: UI Container Status via API response
             print("  🖥️  Testing UI Container...")
             ui_test = self.test_endpoint("home", "/")
-            
+
             if ui_test["status"] == "success":
                 container_results["ui_container"]["status"] = "success"
                 container_results["ui_container"]["details"] = {
@@ -130,10 +130,15 @@ class DeploymentTester:
 
             # Test 3: History Fetcher Status via API endpoints
             print("  📊 Testing History Fetcher...")
-            history_manifest = self.test_endpoint("history_manifest", "/api/history/manifest")
+            history_manifest = self.test_endpoint(
+                "history_manifest", "/api/history/manifest"
+            )
             history_status = self.test_endpoint("history_status", "/api/history/status")
-            
-            if history_manifest["status"] == "success" and history_status["status"] == "success":
+
+            if (
+                history_manifest["status"] == "success"
+                and history_status["status"] == "success"
+            ):
                 container_results["history_fetcher"]["status"] = "success"
                 container_results["history_fetcher"]["details"] = {
                     "status": "operational",
@@ -142,7 +147,10 @@ class DeploymentTester:
                     "response_time": history_manifest["response_time"],
                 }
                 print("    ✅ History fetcher operational")
-            elif history_manifest["status"] == "success" or history_status["status"] == "success":
+            elif (
+                history_manifest["status"] == "success"
+                or history_status["status"] == "success"
+            ):
                 container_results["history_fetcher"]["status"] = "warning"
                 container_results["history_fetcher"][
                     "error"
@@ -162,8 +170,10 @@ class DeploymentTester:
 
             # Test 4: Container Configuration via API
             print("  ⚙️  Testing Container Configuration...")
-            system_resources = self.test_endpoint("system_resources", "/api/system/resources")
-            
+            system_resources = self.test_endpoint(
+                "system_resources", "/api/system/resources"
+            )
+
             if system_resources["status"] == "success" and system_resources["data"]:
                 print("    ✅ Container configuration accessible via API")
             else:
@@ -419,12 +429,18 @@ class DeploymentTester:
             if history_result["status"] == "success":
                 manifest_data = history_result.get("data", {})
                 total_files = manifest_data.get("statistics", {}).get("total_files", 0)
-                total_size_mb = manifest_data.get("statistics", {}).get("total_size_bytes", 0)
-                total_size_mb = round(total_size_mb / (1024 * 1024), 2) if total_size_mb > 0 else 0
-                
+                total_size_mb = manifest_data.get("statistics", {}).get(
+                    "total_size_bytes", 0
+                )
+                total_size_mb = (
+                    round(total_size_mb / (1024 * 1024), 2) if total_size_mb > 0 else 0
+                )
+
                 if total_files > 100 and total_size_mb > 10:
                     phase4_results["data_connector"]["status"] = "success"
-                    print(f"    ✅ Historical data accessible: {total_files} files, {total_size_mb} MB")
+                    print(
+                        f"    ✅ Historical data accessible: {total_files} files, {total_size_mb} MB"
+                    )
                 elif total_files > 0:
                     phase4_results["data_connector"]["status"] = "warning"
                     phase4_results["data_connector"][
@@ -530,8 +546,10 @@ class DeploymentTester:
             print("    🔍 Checking collected data via API...")
 
             # Use the API endpoint instead of SSH
-            manifest_result = self.test_endpoint("history_manifest", "/api/history/manifest")
-            
+            manifest_result = self.test_endpoint(
+                "history_manifest", "/api/history/manifest"
+            )
+
             if manifest_result["status"] != "success":
                 return {
                     "status": "error",
@@ -539,14 +557,24 @@ class DeploymentTester:
                 }
 
             manifest_data = manifest_result.get("data", {})
-            
+
             # Check if we have substantial data
             total_files = manifest_data.get("statistics", {}).get("total_files", 0)
-            total_size_bytes = manifest_data.get("statistics", {}).get("total_size_bytes", 0)
-            total_size_mb = round(total_size_bytes / (1024 * 1024), 2) if total_size_bytes > 0 else 0
-            
-            symbols = list(manifest_data.get("statistics", {}).get("symbols", {}).keys())
-            intervals = list(manifest_data.get("statistics", {}).get("intervals", {}).keys())
+            total_size_bytes = manifest_data.get("statistics", {}).get(
+                "total_size_bytes", 0
+            )
+            total_size_mb = (
+                round(total_size_bytes / (1024 * 1024), 2)
+                if total_size_bytes > 0
+                else 0
+            )
+
+            symbols = list(
+                manifest_data.get("statistics", {}).get("symbols", {}).keys()
+            )
+            intervals = list(
+                manifest_data.get("statistics", {}).get("intervals", {}).keys()
+            )
 
             if total_files > 100 and total_size_mb > 10:
                 return {

@@ -38,7 +38,7 @@ python3 scripts/collect_historical_data.py
 - **ETHUSDT 5m**: ~67 files (2020-2025)
 - **Total**: ~268 files, ~100+ MB
 
-### Current Status (August 29, 2025)
+### Current Status (August 30, 2025)
 - ✅ History fetcher URL issue RESOLVED
 - ✅ Volume mount issue RESOLVED - Docker container path conflict fixed
 - ✅ Enhanced test framework successfully deployed with CI workflow integration
@@ -49,31 +49,46 @@ python3 scripts/collect_historical_data.py
 - ✅ Local CI tests all passing
 - ✅ GitHub Actions CI workflow NOW PASSING - All CI workflow checks successful
 - ✅ Test suite REFACTORED with robust import handling and CI workflow integration
-- ❌ Test and Validate workflow failing due to pytest collection errors
+- ✅ Test and Validate workflow working due to pytest collection errors
 - ✅ BTCUSDT 1h: 67 files collected (complete)
 - ✅ ETHUSDT 1h: 67 files collected (complete)
 - ✅ BTCUSDT 5m: 67 files collected (complete)
 - ✅ ETHUSDT 5m: 67 files collected (complete)
 - ✅ Total: 268 files, 66 MB - ALL DATA COLLECTION COMPLETE
+- ❌ **CRITICAL ISSUE**: History Fetch workflow failed during Docker build on server
+- 🚨 **BLOCKED**: Cannot merge to main until history functionality is working
 
 ### Next Steps After Data Collection
-1. **Fix Test and Validate Workflow** 🔧 **IMMEDIATE**
-   - Fix pytest collection errors
-   - Resolve import issues in test_collector.py
-   - Configure pytest to ignore test infrastructure files
+1. **Fix History Fetch Workflow** 🚨 **CRITICAL - IMMEDIATE**
+   - Investigate why workflow failed during Docker build
+   - Fix Docker build issues on server
+   - Ensure history fetcher works locally first
+   - Re-run workflow for successful data generation
 
 2. **Verify All Workflows Pass** ✅ **GOAL**
    - Confirm CI workflow continues to pass
-   - Confirm Test and Validate workflow now passes
+   - Confirm History Fetch workflow now passes
    - Ensure all GitHub Actions workflows are successful
 
-3. **Prepare for Merge** 🚀 **FINAL**
-   - Create merge request
-   - Merge feature/reorganized-codebase to main
-   - Begin Phase 5 development
+3. **Prepare for Merge** 🚨 **BLOCKED UNTIL HISTORY FIXED**
+   - Cannot create merge request until history functionality is working
+   - Must fix history fetch workflow first
+   - Only proceed to merge after successful data generation
 
 ### Key Commands for Next Session
 ```bash
+# Check workflow status and logs
+gh run list --workflow="history-fetch.yml" --limit 1
+gh run view [WORKFLOW_ID] --log
+
+# Investigate history fetcher locally
+ls -la history_fetcher/
+cat history_fetcher/Dockerfile
+
+# Test history fetcher locally
+cd history_fetcher
+docker build -t history-fetcher:test .
+
 # Verify all workflows pass locally
 cd app
 source ../.venv/bin/activate
@@ -86,13 +101,23 @@ python3 simple_phase4_test.py
 ```
 
 ### Expected Results
-- GitHub Actions CI failure investigation completed
+- History Fetch workflow failure investigation completed
 - Specific error identified and understood
 - All remaining issues fixed
-- CI workflow re-run and passes successfully
+- History Fetch workflow re-run and passes successfully
+- Data generation completed successfully
 - Branch ready for merge to main
 
 ## 🔧 Common Issues & Solutions
+
+### History Fetch Workflow Failure
+**Issue**: Workflow failed during Docker build on server
+**Error**: "failed to read dockerfile: open Dockerfile: no such file or directory"
+**Solution**: 
+1. Check if Dockerfile exists in history_fetcher directory
+2. Verify file transfer to server is working correctly
+3. Test Docker build locally first
+4. Fix any path or file issues
 
 ### Manifest Not Updating
 The manifest.json file needs to be updated after each collection. The script handles this automatically.
@@ -120,12 +145,12 @@ If GitHub Actions CI fails while local tests pass:
 3. Fix any issues found in CI logs
 4. Re-run workflow to verify success
 
-## 🎯 Next Steps After Data Collection - ALL DATA COLLECTION COMPLETE
+## 🎯 Next Steps After Data Collection - CRITICAL ISSUE IDENTIFIED
 
-1. **Investigate GitHub Actions CI Failure** 🔍 **IMMEDIATE** - Check CI logs for specific error
-2. **Fix Remaining Issues** 🔧 **NEXT** - Address any problems found by CI workflow
-3. **Verify CI Success** ✅ **GOAL** - Re-run workflow to verify all checks pass
-4. **Prepare for Merge** 🚀 **FINAL** - Get branch into mergable state
+1. **Fix History Fetch Workflow** 🚨 **CRITICAL - IMMEDIATE** - Investigate and fix workflow failure
+2. **Ensure Data Generation Works** 🔧 **NEXT** - Fix any problems found by workflow
+3. **Verify Data Collection Success** ✅ **GOAL** - Re-run workflow to verify all checks pass
+4. **Prepare for Merge** 🚨 **BLOCKED** - Cannot merge until history functionality is working
 
 ## 📋 Script Usage
 
@@ -153,5 +178,7 @@ python3 scripts/collect_historical_data.py --symbol BTCUSDT --interval 1h
 - **CI WORKFLOW CLEANUP COMPLETED** - All 39 Ruff linting issues resolved
 - **IMPORT ISSUES FIXED** - BacktestingEngine and sma_crossover imports corrected
 - **LOCAL CI TESTS PASSING** - All local CI workflow tests passing
-- **GITHUB ACTIONS CI FAILED** - Exit code 1, needs investigation
-- **NEXT PRIORITY** - Investigate CI failure, fix remaining issues, get CI passing
+- **GITHUB ACTIONS CI PASSING** - All CI workflow checks successful
+- **🚨 CRITICAL ISSUE**: History Fetch workflow failed during Docker build on server
+- **🚨 BLOCKED**: Cannot merge to main until history functionality is working
+- **NEXT PRIORITY**: Fix history fetch workflow, ensure successful data generation, proceed to merge

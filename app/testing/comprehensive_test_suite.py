@@ -8,15 +8,14 @@ Maintains 100% success rate by testing only what works
 
 import sys
 import os
-import importlib
 import subprocess
 from typing import Any, Optional, Tuple
 
-# Add the app directory to Python path for proper imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
 # Import test infrastructure
 from test_infrastructure import TestSuite, safe_import_test, safe_function_test, logger
+
+# Import clean import resolver
+from import_resolver import import_resolver
 
 
 class ComprehensiveTestSuite(TestSuite):
@@ -68,73 +67,10 @@ class ComprehensiveTestSuite(TestSuite):
         self, module_path: str, class_name: Optional[str] = None
     ) -> Tuple[bool, Any]:
         """
-        Safely import a module with multiple fallback strategies
+        Clean import using the import resolver
         Returns (success, result_or_error_message)
         """
-        strategies = [
-            # Strategy 1: Direct import
-            lambda: self._try_direct_import(module_path, class_name),
-            # Strategy 2: Relative import from parent
-            lambda: self._try_relative_import(module_path, class_name),
-            # Strategy 3: Absolute import with app prefix
-            lambda: self._try_absolute_import(module_path, class_name),
-        ]
-
-        for i, strategy in enumerate(strategies, 1):
-            try:
-                result = strategy()
-                if result[0]:  # Success
-                    return True, result[1]
-            except Exception as e:
-                if i == len(strategies):
-                    return False, f"All import strategies failed. Last error: {str(e)}"
-                continue
-
-        return False, "All import strategies failed"
-
-    def _try_direct_import(
-        self, module_path: str, class_name: Optional[str] = None
-    ) -> Tuple[bool, Any]:
-        """Try direct import from current Python path"""
-        try:
-            if class_name:
-                module = importlib.import_module(module_path)
-                return True, getattr(module, class_name)
-            else:
-                return True, importlib.import_module(module_path)
-        except Exception:
-            return False, None
-
-    def _try_relative_import(
-        self, module_path: str, class_name: Optional[str] = None
-    ) -> Tuple[bool, Any]:
-        """Try relative import from parent directory"""
-        try:
-            # Since we're in app/testing, try to import from parent
-            parent_module_path = f"..{module_path}"
-            if class_name:
-                module = importlib.import_module(parent_module_path, package="testing")
-                return True, getattr(module, class_name)
-            else:
-                return True, importlib.import_module(
-                    parent_module_path, package="testing"
-                )
-        except Exception:
-            return False, None
-
-    def _try_absolute_import(
-        self, module_path: str, class_name: Optional[str] = None
-    ) -> Tuple[bool, Any]:
-        """Try absolute import with app prefix"""
-        try:
-            absolute_path = f"app.{module_path}"
-            if class_name:
-                module = importlib.import_module(absolute_path)
-                return True, getattr(module, class_name)
-            else:
-                return True, importlib.import_module(absolute_path)
-        except Exception:
-            return False, None
+        return import_resolver.resolve_import(module_path, class_name)
 
     def _test_core_trading_logic(self) -> None:
         """Test core trading logic - only what exists"""
@@ -700,16 +636,20 @@ class ComprehensiveTestSuite(TestSuite):
     def _validate_pytest_collection(self) -> bool:
         """Validate that pytest can collect tests without errors"""
         try:
-            # Run pytest collection only
+            # Run pytest collection only - use relative path from app directory
             result = subprocess.run(
-                [sys.executable, "-m", "pytest", "testing/", "--collect-only", "-q"],
+                [sys.executable, "-m", "pytest", ".", "--collect-only", "-q"],
                 capture_output=True,
                 text=True,
-                cwd=".",
+                cwd=os.path.dirname(
+                    os.path.dirname(__file__)
+                ),  # Run from app directory
             )
 
             if result.returncode != 0:
-                logger.error(f"Pytest collection failed:\n{result.stdout}\n{result.stderr}")
+                logger.error(
+                    f"Pytest collection failed:\n{result.stdout}\n{result.stderr}"
+                )
                 return False
 
             # Check that tests were collected
@@ -726,16 +666,26 @@ class ComprehensiveTestSuite(TestSuite):
     def _validate_pytest_execution(self) -> bool:
         """Validate that pytest can execute tests successfully"""
         try:
-            # Run pytest on basic functionality tests only
+            # Run pytest on basic functionality tests only - use relative path from app directory
             result = subprocess.run(
-                [sys.executable, "-m", "pytest", "testing/test_basic_functionality.py", "-v"],
+                [
+                    sys.executable,
+                    "-m",
+                    "pytest",
+                    "testing/test_basic_functionality.py",
+                    "-v",
+                ],
                 capture_output=True,
                 text=True,
-                cwd=".",
+                cwd=os.path.dirname(
+                    os.path.dirname(__file__)
+                ),  # Run from app directory
             )
 
             if result.returncode != 0:
-                logger.error(f"Pytest execution failed:\n{result.stdout}\n{result.stderr}")
+                logger.error(
+                    f"Pytest execution failed:\n{result.stdout}\n{result.stderr}"
+                )
                 return False
 
             # Check that tests passed
@@ -752,20 +702,31 @@ class ComprehensiveTestSuite(TestSuite):
     def _validate_deployment_workflows_exist(self) -> bool:
         """Validate that all required deployment workflow files exist"""
         try:
-            workflows_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".github", "workflows")
-            
+            workflows_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                ".github",
+                "workflows",
+            )
+
             if not os.path.exists(workflows_dir):
-                logger.warning("Workflows directory not found, skipping workflow existence validation")
+                logger.warning(
+                    "Workflows directory not found, skipping workflow existence validation"
+                )
                 return True
-                
-            required_workflows = ["deploy-core.yml", "deploy-data.yml", "deploy-config.yml", "deploy.yml"]
-            
+
+            required_workflows = [
+                "deploy-core.yml",
+                "deploy-data.yml",
+                "deploy-config.yml",
+                "deploy.yml",
+            ]
+
             for workflow in required_workflows:
                 workflow_path = os.path.join(workflows_dir, workflow)
                 if not os.path.exists(workflow_path):
                     logger.error(f"Required workflow file missing: {workflow}")
                     return False
-            
+
             logger.info("All required deployment workflow files exist")
             return True
         except Exception as e:
@@ -775,26 +736,31 @@ class ComprehensiveTestSuite(TestSuite):
     def _validate_deployment_workflow_syntax(self) -> bool:
         """Validate that all deployment workflow files have valid YAML syntax"""
         try:
-            workflows_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".github", "workflows")
-            
+            workflows_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                ".github",
+                "workflows",
+            )
+
             # Try to import yaml, but don't fail if it's not available
             try:
                 import yaml
-                yaml_available = True
             except ImportError:
                 logger.warning("PyYAML not available, skipping YAML syntax validation")
                 return True
-            
+
             for workflow_file in os.listdir(workflows_dir):
-                if workflow_file.endswith('.yml'):
+                if workflow_file.endswith(".yml"):
                     workflow_path = os.path.join(workflows_dir, workflow_file)
                     try:
-                        with open(workflow_path, 'r') as f:
+                        with open(workflow_path, "r") as f:
                             yaml.safe_load(f)
                     except Exception as e:
-                        logger.error(f"Workflow {workflow_file} has invalid YAML syntax: {e}")
+                        logger.error(
+                            f"Workflow {workflow_file} has invalid YAML syntax: {e}"
+                        )
                         return False
-            
+
             logger.info("All deployment workflow files have valid YAML syntax")
             return True
         except Exception as e:
@@ -804,44 +770,62 @@ class ComprehensiveTestSuite(TestSuite):
     def _validate_deployment_data_preservation(self) -> bool:
         """Validate that deployment workflows preserve data directories"""
         try:
-            workflows_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".github", "workflows")
-            
+            workflows_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                ".github",
+                "workflows",
+            )
+
             if not os.path.exists(workflows_dir):
-                logger.warning("Workflows directory not found, skipping data preservation validation")
+                logger.warning(
+                    "Workflows directory not found, skipping data preservation validation"
+                )
                 return True
-            
+
             # Check deploy-core.yml for data preservation
             core_workflow = os.path.join(workflows_dir, "deploy-core.yml")
             if os.path.exists(core_workflow):
                 try:
-                    with open(core_workflow, 'r') as f:
+                    with open(core_workflow, "r") as f:
                         content = f.read()
-                    
+
                     # Should NOT have --delete for data directories
-                    if '--delete' in content and 'history' not in content and 'data' not in content:
-                        logger.info("Core deployment workflow preserves data directories")
+                    if (
+                        "--delete" in content
+                        and "history" not in content
+                        and "data" not in content
+                    ):
+                        logger.info(
+                            "Core deployment workflow preserves data directories"
+                        )
                     else:
-                        logger.error("Core deployment workflow may affect data directories")
+                        logger.error(
+                            "Core deployment workflow may affect data directories"
+                        )
                         return False
                 except Exception as e:
                     logger.error(f"Failed to read core workflow: {e}")
                     return False
-            
+
             # Check deploy-data.yml for data preservation
             data_workflow = os.path.join(workflows_dir, "deploy-data.yml")
             if os.path.exists(data_workflow):
                 try:
-                    with open(data_workflow, 'r') as f:
+                    with open(data_workflow, "r") as f:
                         content = f.read()
-                    
-                    if 'preserve collected data' in content:
-                        logger.info("Data deployment workflow explicitly preserves collected data")
+
+                    if "preserve collected data" in content:
+                        logger.info(
+                            "Data deployment workflow explicitly preserves collected data"
+                        )
                     else:
-                        logger.warning("Data deployment workflow has no explicit data preservation message")
+                        logger.warning(
+                            "Data deployment workflow has no explicit data preservation message"
+                        )
                 except Exception as e:
                     logger.error(f"Failed to read data workflow: {e}")
                     return False
-            
+
             logger.info("Deployment data preservation validation passed")
             return True
         except Exception as e:

@@ -1,0 +1,12 @@
+.warmup/assistant-guide.md
+.warmup/current-status.md
+.warmup/goal.txt
+.warmup/interaction_guide.md
+.warmup/plan.md
+.warmup/test.md
+app/simple_phase4_test.py
+app/strategy/__init__.py
+app/strategy/backtesting.py
+app/testing/comprehensive_test_suite.py
+app/testing/deployment_test_suite.py
+app/testing/deployment_workflow_test_suite.py
