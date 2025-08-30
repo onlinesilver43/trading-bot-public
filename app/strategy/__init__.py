@@ -8,7 +8,7 @@ Provides access to strategy components, backtesting, and performance tracking.
 from .performance_db import StrategyPerformanceDB  # noqa: F401
 
 # Backtesting framework
-from .backtesting import BacktestingFramework  # noqa: F401
+from .backtesting import BacktestingEngine  # noqa: F401
 
 # Strategy implementations
-from .sma_crossover import SMACrossoverStrategy  # noqa: F401
+from .sma_crossover import decide, indicators  # noqa: F401
