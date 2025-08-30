@@ -1,13 +1,14 @@
+# Strategy Package
 """
-Strategy Package for Trading Bot System
-Contains trading strategies, performance tracking, and backtesting components.
+Strategy implementation package for the trading bot system.
+Provides access to strategy components, backtesting, and performance tracking.
 """
 
-# Import strategy components for easy access
-try:
-    from .performance_db import StrategyPerformanceDB
-    from .backtesting import BacktestingFramework
-    from .sma_crossover import SMACrossoverStrategy
-except ImportError:
-    # Allow import even if some components aren't available
-    pass
+# Strategy performance database
+from .performance_db import StrategyPerformanceDB  # noqa: F401
+
+# Backtesting framework
+from .backtesting import BacktestingFramework  # noqa: F401
+
+# Strategy implementations
+from .sma_crossover import SMACrossoverStrategy  # noqa: F401

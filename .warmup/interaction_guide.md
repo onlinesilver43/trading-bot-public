@@ -43,53 +43,63 @@ python3 scripts/collect_historical_data.py
 - ✅ Volume mount issue RESOLVED - Docker container path conflict fixed
 - ✅ Enhanced test framework successfully deployed
 - ✅ Git conflicts resolved and enhanced framework pushed
+- 🔄 CI workflow testing IN PROGRESS - 80 Ruff issues auto-fixed, 39 remaining
 - ✅ BTCUSDT 1h: 67 files collected (complete)
-- 🔄 ETHUSDT 1h: Pending collection
-- 🔄 BTCUSDT 5m: Pending collection
-- 🔄 ETHUSDT 5m: Pending collection
+- ✅ ETHUSDT 1h: 67 files collected (complete)
+- ✅ BTCUSDT 5m: 67 files collected (complete)
+- ✅ ETHUSDT 5m: 67 files collected (complete)
+- ✅ Total: 268 files, 66 MB - ALL DATA COLLECTION COMPLETE
 
 ### Next Steps After Data Collection
-1. **Test Enhanced Test Framework with Real Data**
+1. **Complete CI Workflow Cleanup** 🔄 **IN PROGRESS**
    ```bash
    cd app
-   python3 test_phase4_integration.py --real-data
+   ../.venv/bin/python3 -m ruff check . --output-format=concise
+   ../.venv/bin/python3 -m ruff check . --fix
    ```
 
-2. **Validate Real Data Access**
+2. **Verify All Workflows Pass** 🔄 **NEXT**
    ```bash
-   python3 simple_phase4_test.py --real-data
-   python3 testing/test_phase4_suite.py
+   ../.venv/bin/python3 -m ruff check .
+   ../.venv/bin/python3 -m black --check .
+   ../.venv/bin/python3 -m py_compile .
    ```
 
-3. **Complete Remaining Data Collection**
+3. **Test Docker Build** 🔄 **PENDING**
    ```bash
-   python3 scripts/collect_historical_data.py
+   cd /mnt/c/tradingBot/repo
+   docker build -t tb-app-ci app
    ```
 
-4. **Begin Strategy Discovery Phase**
-   - Test Phase 4 components with real market data
-   - Validate Master Agent strategy selection
-   - Begin paper trading with discovered strategies
+4. **Prepare for Merge** 🚀 **GOAL**
+   - Verify all CI workflows pass
+   - Create merge request
+   - Merge feature/reorganized-codebase to main
 
 ### Key Commands for Next Session
 ```bash
-# Test enhanced framework
+# Complete CI workflow cleanup
 cd app
-python3 test_phase4_integration.py --real-data
+../.venv/bin/python3 -m ruff check . --output-format=concise
+../.venv/bin/python3 -m ruff check . --fix
 
-# Test individual components
-python3 simple_phase4_test.py --real-data
-python3 testing/test_phase4_suite.py
+# Test Docker build
+cd /mnt/c/tradingBot/repo
+docker build -t tb-app-ci app
 
-# Complete data collection
-python3 scripts/collect_historical_data.py
+# Verify all workflows pass
+cd app
+../.venv/bin/python3 -m ruff check .
+../.venv/bin/python3 -m black --check .
+../.venv/bin/python3 -m py_compile .
 ```
 
 ### Expected Results
-- Enhanced test framework working with real data
-- All existing tests continue to pass
-- New real data testing capabilities functional
-- Ready for Phase 4 component validation with real market data
+- CI workflow cleanup completes successfully
+- All remaining 39 Ruff linting issues resolved
+- Docker build test passes
+- All CI workflow tests pass locally
+- Branch ready for merge to main
 
 ## 🔧 Common Issues & Solutions
 
@@ -112,13 +122,12 @@ sshpass -f ~/.ssh/tb_pw ssh tb "find /srv/trading-bots/history/parquet/ -name '*
 sshpass -f ~/.ssh/tb_pw ssh tb "du -sh /srv/trading-bots/history/parquet/*"
 ```
 
-## 🎯 Next Steps After Data Collection - VOLUME MOUNT ISSUE RESOLVED
+## 🎯 Next Steps After Data Collection - ALL DATA COLLECTION COMPLETE
 
-1. **Complete Remaining Data Collection** - Finish ETHUSDT 1h, BTCUSDT 5m, ETHUSDT 5m
-2. **Test Phase 4 Components** with real data
-3. **Run Historical Analysis Bot** with collected data
-4. **Begin Strategy Discovery** with real market patterns
-5. **Test Master Agent** strategy selection
+1. **Complete CI Workflow Cleanup** 🔄 **IN PROGRESS** - Resolve remaining 39 Ruff linting issues
+2. **Verify All Workflows Pass** 🔄 **NEXT** - Test all CI workflow tests locally
+3. **Test Docker Build** 🔄 **PENDING** - Ensure Docker build test passes
+4. **Prepare for Merge** 🚀 **GOAL** - Get branch into mergable state
 
 ## 📋 Script Usage
 
@@ -142,3 +151,5 @@ python3 scripts/collect_historical_data.py --symbol BTCUSDT --interval 1h
 - **Volume mount** must be `/srv/trading-bots/history:/app/history`
 - **Volume mount issue RESOLVED** - Docker container path conflict fixed
 - **File storage VERIFIED** - Data properly accessible on host system
+- **ALL DATA COLLECTION COMPLETE** - 268 files, 66 MB total
+- **CI WORKFLOW CLEANUP IN PROGRESS** - 80 issues auto-fixed, 39 remaining

@@ -64,7 +64,9 @@ def load_profile() -> Dict[str, Any]:
     profile: Dict[str, Any] = {}
 
     if name:
-        profile_dir = os.path.join(os.path.dirname(__file__), "..", "config", "strategies")
+        profile_dir = os.path.join(
+            os.path.dirname(__file__), "..", "config", "strategies"
+        )
         if not os.path.isdir(profile_dir) and os.path.isdir("/config/strategies"):
             profile_dir = "/config/strategies"
         path = os.path.join(profile_dir, f"{name}.json")

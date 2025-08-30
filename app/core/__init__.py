@@ -1,11 +1,8 @@
+# Core Package
 """
-Core Package for Trading Bot System
-Contains core utilities, time functions, and trading algorithms.
+Core utilities and functions package for the trading bot system.
+Provides access to time utilities, technical indicators, and core functions.
 """
 
-# Import core utilities for easy access
-try:
-    from .utils import now_iso, tf_to_ms, sma_series
-except ImportError:
-    # Allow import even if some components aren't available
-    pass
+# Core utility functions
+from .utils import now_iso, tf_to_ms, sma_series  # noqa: F401

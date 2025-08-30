@@ -1,11 +1,8 @@
+# Portfolio Package
 """
-Portfolio Package for Trading Bot System
-Contains portfolio management and position tracking components.
+Portfolio management package for the trading bot system.
+Provides access to portfolio tracking and management components.
 """
 
-# Import portfolio components for easy access
-try:
-    from .portfolio import Portfolio
-except ImportError:
-    # Allow import even if some components aren't available
-    pass
+# Portfolio management
+from .portfolio import Portfolio  # noqa: F401

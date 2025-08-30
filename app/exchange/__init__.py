@@ -1,11 +1,8 @@
+# Exchange Package
 """
-Exchange Package for Trading Bot System
-Contains exchange integration and API client components.
+Exchange integration package for the trading bot system.
+Provides access to exchange clients and trading interfaces.
 """
 
-# Import exchange components for easy access
-try:
-    from .ccxt_client import Client
-except ImportError:
-    # Allow import even if some components aren't available
-    pass
+# Exchange client
+from .ccxt_client import Client  # noqa: F401

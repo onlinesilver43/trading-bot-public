@@ -10,7 +10,9 @@ DATA_DIR = os.getenv("DATA_DIR", "/data")
 STATE_PATH = os.getenv("STATE_PATH", os.path.join(DATA_DIR, "paper_state.json"))
 TRADES_PATH = os.getenv("TRADES_PATH", os.path.join(DATA_DIR, "paper_trades.json"))
 HOST_APP = os.getenv("HOST_APP", "/host_app")  # /srv/trading-bots/app (ro)
-HOST_COMPOSE = os.getenv("HOST_COMPOSE", "/host_compose")  # /srv/trading-bots/compose (ro)
+HOST_COMPOSE = os.getenv(
+    "HOST_COMPOSE", "/host_compose"
+)  # /srv/trading-bots/compose (ro)
 HOST_GITHUB = os.getenv("HOST_GITHUB", "/host_github")  # /srv/trading-bots/.github (ro)
 
 DIAG_FILES = [
@@ -240,10 +242,16 @@ def api_retains_total():
 
 # Import enhanced monitoring functions
 try:
-    from ui_enhanced import get_enhanced_system_health, get_enhanced_system_resources, get_enhanced_system_performance
+    from ui_enhanced import (
+        get_enhanced_system_health,
+        get_enhanced_system_resources,
+        get_enhanced_system_performance,
+    )
+
     ENHANCED_AVAILABLE = True
 except ImportError:
     ENHANCED_AVAILABLE = False
+
 
 @app.get("/api/system/health")
 def api_system_health():
@@ -253,23 +261,28 @@ def api_system_health():
             result = get_enhanced_system_health()
             return JSONResponse(result)
         except Exception as e:
-            return JSONResponse({
-                "status": "error",
-                "message": f"Enhanced monitoring failed: {str(e)}",
-                "timestamp": "unknown",
-                "system": {"message": "Enhanced mode failed"},
-                "containers": {"message": "Enhanced mode failed"},
-                "api_health": {"message": "Enhanced mode failed"}
-            }, status_code=500)
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "message": f"Enhanced monitoring failed: {str(e)}",
+                    "timestamp": "unknown",
+                    "system": {"message": "Enhanced mode failed"},
+                    "containers": {"message": "Enhanced mode failed"},
+                    "api_health": {"message": "Enhanced mode failed"},
+                },
+                status_code=500,
+            )
     else:
-        return JSONResponse({
-            "status": "basic",
-            "message": "Enhanced system monitoring not available",
-            "timestamp": "unknown",
-            "system": {"message": "Basic mode"},
-            "containers": {"message": "Basic mode"},
-            "api_health": {"message": "Basic mode"}
-        })
+        return JSONResponse(
+            {
+                "status": "basic",
+                "message": "Enhanced system monitoring not available",
+                "timestamp": "unknown",
+                "system": {"message": "Basic mode"},
+                "containers": {"message": "Basic mode"},
+                "api_health": {"message": "Basic mode"},
+            }
+        )
 
 
 @app.get("/api/system/deployments")
@@ -278,31 +291,37 @@ def api_deployments():
     try:
         backup_dir = "/srv/trading-bots-backups"
         deployments = []
-        
+
         if os.path.exists(backup_dir):
             for item in os.listdir(backup_dir):
                 item_path = os.path.join(backup_dir, item)
                 if os.path.isdir(item_path):
                     stat = os.stat(item_path)
-                    deployments.append({
-                        "name": item,
-                        "created": stat.st_mtime,
-                        "size": sum(os.path.getsize(os.path.join(dirpath, filename))
-                                  for dirpath, dirnames, filenames in os.walk(item_path)
-                                  for filename in filenames)
-                    })
-        
+                    deployments.append(
+                        {
+                            "name": item,
+                            "created": stat.st_mtime,
+                            "size": sum(
+                                os.path.getsize(os.path.join(dirpath, filename))
+                                for dirpath, dirnames, filenames in os.walk(item_path)
+                                for filename in filenames
+                            ),
+                        }
+                    )
+
         # Sort by creation time (newest first)
         deployments.sort(key=lambda x: x["created"], reverse=True)
-        
-        return JSONResponse({
-            "deployments": deployments,
-            "current": {
-                "branch": os.getenv("GIT_BRANCH", "unknown"),
-                "commit": os.getenv("GIT_SHA", "unknown"),
-                "deploy_tag": os.getenv("DEPLOY_TAG", "unknown")
+
+        return JSONResponse(
+            {
+                "deployments": deployments,
+                "current": {
+                    "branch": os.getenv("GIT_BRANCH", "unknown"),
+                    "commit": os.getenv("GIT_SHA", "unknown"),
+                    "deploy_tag": os.getenv("DEPLOY_TAG", "unknown"),
+                },
             }
-        })
+        )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -313,21 +332,25 @@ def api_rollback(backup_name: str):
     try:
         backup_dir = "/srv/trading-bots-backups"
         backup_path = os.path.join(backup_dir, backup_name)
-        
+
         if not os.path.exists(backup_path):
             raise HTTPException(404, f"Backup {backup_name} not found")
-        
+
         # Return backup info (actual rollback done via GitHub Actions)
         stat = os.stat(backup_path)
-        return JSONResponse({
-            "backup_name": backup_name,
-            "exists": True,
-            "created": stat.st_mtime,
-            "size": sum(os.path.getsize(os.path.join(dirpath, filename))
-                      for dirpath, dirnames, filenames in os.walk(backup_path)
-                      for filename in filenames),
-            "rollback_instructions": "Use GitHub Actions 'Rollback Deployment' workflow with this backup name"
-        })
+        return JSONResponse(
+            {
+                "backup_name": backup_name,
+                "exists": True,
+                "created": stat.st_mtime,
+                "size": sum(
+                    os.path.getsize(os.path.join(dirpath, filename))
+                    for dirpath, dirnames, filenames in os.walk(backup_path)
+                    for filename in filenames
+                ),
+                "rollback_instructions": "Use GitHub Actions 'Rollback Deployment' workflow with this backup name",
+            }
+        )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -340,25 +363,30 @@ def api_resources():
             result = get_enhanced_system_resources()
             return JSONResponse(result)
         except Exception as e:
-            return JSONResponse({
-                "status": "error",
-                "message": f"Enhanced monitoring failed: {str(e)}",
-                "timestamp": "unknown",
-                "memory": {"message": "Enhanced mode failed"},
-                "disk": {"message": "Enhanced mode failed"},
-                "network": {"message": "Enhanced mode failed"},
-                "top_processes": []
-            }, status_code=500)
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "message": f"Enhanced monitoring failed: {str(e)}",
+                    "timestamp": "unknown",
+                    "memory": {"message": "Enhanced mode failed"},
+                    "disk": {"message": "Enhanced mode failed"},
+                    "network": {"message": "Enhanced mode failed"},
+                    "top_processes": [],
+                },
+                status_code=500,
+            )
     else:
-        return JSONResponse({
-            "status": "basic",
-            "message": "Enhanced system monitoring not available",
-            "timestamp": "unknown",
-            "memory": {"message": "Basic mode"},
-            "disk": {"message": "Basic mode"},
-            "network": {"message": "Basic mode"},
-            "top_processes": []
-        })
+        return JSONResponse(
+            {
+                "status": "basic",
+                "message": "Enhanced system monitoring not available",
+                "timestamp": "unknown",
+                "memory": {"message": "Basic mode"},
+                "disk": {"message": "Basic mode"},
+                "network": {"message": "Basic mode"},
+                "top_processes": [],
+            }
+        )
 
 
 @app.get("/api/system/performance")
@@ -369,17 +397,22 @@ def api_system_performance():
             result = get_enhanced_system_performance()
             return JSONResponse(result)
         except Exception as e:
-            return JSONResponse({
-                "status": "error",
-                "message": f"Enhanced monitoring failed: {str(e)}",
-                "timestamp": "unknown"
-            }, status_code=500)
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "message": f"Enhanced monitoring failed: {str(e)}",
+                    "timestamp": "unknown",
+                },
+                status_code=500,
+            )
     else:
-        return JSONResponse({
-            "status": "basic",
-            "message": "Enhanced system monitoring not available",
-            "timestamp": "unknown"
-        })
+        return JSONResponse(
+            {
+                "status": "basic",
+                "message": "Enhanced system monitoring not available",
+                "timestamp": "unknown",
+            }
+        )
 
 
 @app.get("/deployment", response_class=HTMLResponse)
@@ -452,33 +485,41 @@ def deployment_page():
 
 # --- NEW: History Fetcher UI Integration ---
 
+
 @app.get("/api/history/manifest")
 def api_history_manifest():
     """Get history data manifest and inventory"""
     try:
         history_dir = "/srv/trading-bots/history"
         manifest_path = os.path.join(history_dir, "manifest.json")
-        
+
         if not os.path.exists(manifest_path):
-            return JSONResponse({
-                "status": "no_data",
-                "message": "No history data has been fetched yet"
-            })
-        
-        with open(manifest_path, 'r') as f:
+            return JSONResponse(
+                {"status": "no_data", "message": "No history data has been fetched yet"}
+            )
+
+        with open(manifest_path, "r") as f:
             manifest = json.load(f)
-        
-        return JSONResponse({
-            "status": "available",
-            "manifest": manifest,
-            "summary": {
-                "total_files": manifest.get("statistics", {}).get("total_files", 0),
-                "total_size_mb": round(manifest.get("statistics", {}).get("total_size_bytes", 0) / (1024 * 1024), 2),
-                "symbols": list(manifest.get("data", {}).keys()),
-                "intervals": list(manifest.get("statistics", {}).get("intervals", {}).keys()),
-                "last_updated": manifest.get("last_updated", "unknown")
+
+        return JSONResponse(
+            {
+                "status": "available",
+                "manifest": manifest,
+                "summary": {
+                    "total_files": manifest.get("statistics", {}).get("total_files", 0),
+                    "total_size_mb": round(
+                        manifest.get("statistics", {}).get("total_size_bytes", 0)
+                        / (1024 * 1024),
+                        2,
+                    ),
+                    "symbols": list(manifest.get("data", {}).keys()),
+                    "intervals": list(
+                        manifest.get("statistics", {}).get("intervals", {}).keys()
+                    ),
+                    "last_updated": manifest.get("last_updated", "unknown"),
+                },
             }
-        })
+        )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -488,55 +529,107 @@ def api_history_status():
     """Get history fetcher status and directory information"""
     try:
         history_dir = "/srv/trading-bots/history"
-        
+
         if not os.path.exists(history_dir):
-            return JSONResponse({
-                "status": "not_initialized",
-                "message": "History directory does not exist"
-            })
-        
+            return JSONResponse(
+                {
+                    "status": "not_initialized",
+                    "message": "History directory does not exist",
+                }
+            )
+
         # Check directory structure
         raw_dir = os.path.join(history_dir, "raw")
         csv_dir = os.path.join(history_dir, "csv")
         parquet_dir = os.path.join(history_dir, "parquet")
-        
+
         status = {
             "base_directory": history_dir,
             "directories": {
                 "raw": {
                     "exists": os.path.exists(raw_dir),
-                    "file_count": len(os.listdir(raw_dir)) if os.path.exists(raw_dir) else 0,
-                    "size_mb": round(sum(os.path.getsize(os.path.join(raw_dir, f)) for f in os.listdir(raw_dir) if os.path.isfile(os.path.join(raw_dir, f))) / (1024 * 1024), 2) if os.path.exists(raw_dir) else 0
+                    "file_count": (
+                        len(os.listdir(raw_dir)) if os.path.exists(raw_dir) else 0
+                    ),
+                    "size_mb": (
+                        round(
+                            sum(
+                                os.path.getsize(os.path.join(raw_dir, f))
+                                for f in os.listdir(raw_dir)
+                                if os.path.isfile(os.path.join(raw_dir, f))
+                            )
+                            / (1024 * 1024),
+                            2,
+                        )
+                        if os.path.exists(raw_dir)
+                        else 0
+                    ),
                 },
                 "csv": {
                     "exists": os.path.exists(csv_dir),
-                    "file_count": len(os.listdir(csv_dir)) if os.path.exists(csv_dir) else 0,
-                    "size_mb": round(sum(os.path.getsize(os.path.join(csv_dir, f)) for f in os.listdir(csv_dir) if os.path.isfile(os.path.join(csv_dir, f))) / (1024 * 1024), 2) if os.path.exists(csv_dir) else 0
+                    "file_count": (
+                        len(os.listdir(csv_dir)) if os.path.exists(csv_dir) else 0
+                    ),
+                    "size_mb": (
+                        round(
+                            sum(
+                                os.path.getsize(os.path.join(csv_dir, f))
+                                for f in os.listdir(csv_dir)
+                                if os.path.isfile(os.path.join(csv_dir, f))
+                            )
+                            / (1024 * 1024),
+                            2,
+                        )
+                        if os.path.exists(csv_dir)
+                        else 0
+                    ),
                 },
                 "parquet": {
                     "exists": os.path.exists(parquet_dir),
-                    "file_count": len([f for f in os.listdir(parquet_dir) if f.endswith('.parquet')]) if os.path.exists(parquet_dir) else 0,
-                    "size_mb": round(sum(os.path.getsize(os.path.join(parquet_dir, f)) for f in os.listdir(parquet_dir) if f.endswith('.parquet')) / (1024 * 1024), 2) if os.path.exists(parquet_dir) else 0
-                }
-            }
+                    "file_count": (
+                        len(
+                            [
+                                f
+                                for f in os.listdir(parquet_dir)
+                                if f.endswith(".parquet")
+                            ]
+                        )
+                        if os.path.exists(parquet_dir)
+                        else 0
+                    ),
+                    "size_mb": (
+                        round(
+                            sum(
+                                os.path.getsize(os.path.join(parquet_dir, f))
+                                for f in os.listdir(parquet_dir)
+                                if f.endswith(".parquet")
+                            )
+                            / (1024 * 1024),
+                            2,
+                        )
+                        if os.path.exists(parquet_dir)
+                        else 0
+                    ),
+                },
+            },
         }
-        
+
         # Check manifest
         manifest_path = os.path.join(history_dir, "manifest.json")
         if os.path.exists(manifest_path):
             try:
-                with open(manifest_path, 'r') as f:
+                with open(manifest_path, "r") as f:
                     manifest = json.load(f)
                 status["manifest"] = {
                     "exists": True,
                     "last_updated": manifest.get("last_updated", "unknown"),
-                    "total_files": manifest.get("statistics", {}).get("total_files", 0)
+                    "total_files": manifest.get("statistics", {}).get("total_files", 0),
                 }
             except Exception as e:
                 status["manifest"] = {"exists": True, "error": str(e)}
         else:
             status["manifest"] = {"exists": False}
-        
+
         return JSONResponse(status)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -548,34 +641,36 @@ def api_history_symbol(symbol: str):
     try:
         history_dir = "/srv/trading-bots/history"
         manifest_path = os.path.join(history_dir, "manifest.json")
-        
+
         if not os.path.exists(manifest_path):
             raise HTTPException(404, "No history data available")
-        
-        with open(manifest_path, 'r') as f:
+
+        with open(manifest_path, "r") as f:
             manifest = json.load(f)
-        
+
         if symbol not in manifest.get("data", {}):
             raise HTTPException(404, f"Symbol {symbol} not found in history data")
-        
+
         symbol_data = manifest["data"][symbol]
-        
+
         # Calculate additional statistics
         total_size = 0
         file_counts = {}
-        
+
         for interval, files in symbol_data.items():
             file_counts[interval] = len(files)
             for file_info in files:
                 total_size += file_info.get("size_bytes", 0)
-        
-        return JSONResponse({
-            "symbol": symbol,
-            "intervals": list(symbol_data.keys()),
-            "file_counts": file_counts,
-            "total_size_mb": round(total_size / (1024 * 1024), 2),
-            "files": symbol_data
-        })
+
+        return JSONResponse(
+            {
+                "symbol": symbol,
+                "intervals": list(symbol_data.keys()),
+                "file_counts": file_counts,
+                "total_size_mb": round(total_size / (1024 * 1024), 2),
+                "files": symbol_data,
+            }
+        )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

@@ -1,12 +1,11 @@
+# Data Collection Package
 """
-Data Collection Package for Trading Bot System
-Contains data collection, processing, and storage components.
+Data collection and processing package for the trading bot system.
+Provides access to data preprocessing and historical data collection.
 """
 
-# Import data collection components for easy access
-try:
-    from .data_preprocessor import DataPreprocessor
-    from .historical_data import HistoricalDataCollector
-except ImportError:
-    # Allow import even if some components aren't available
-    pass
+# Data preprocessing components
+from .data_preprocessor import DataPreprocessor  # noqa: F401
+
+# Historical data collection
+from .historical_data import HistoricalDataCollector  # noqa: F401
