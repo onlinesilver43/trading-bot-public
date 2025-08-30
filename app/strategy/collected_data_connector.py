@@ -104,8 +104,8 @@ class CollectedDataConnector:
             with tempfile.NamedTemporaryFile(suffix='.parquet', delete=False) as tmp_file:
                 local_path = tmp_file.name
             
-            # Copy file from server to local temp
-            copy_cmd = f"scp {self.server_alias}:{file_path} {local_path}"
+            # Copy file from server to local temp using sshpass
+            copy_cmd = f"sshpass -f ~/.ssh/tb_pw scp tb:{file_path} {local_path}"
             copy_result = subprocess.run(copy_cmd, shell=True, capture_output=True, text=True)
             
             if copy_result.returncode != 0:

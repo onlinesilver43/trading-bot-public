@@ -109,15 +109,25 @@ class SimplePhase4Test:
             logger.info("Testing test data connector...")
             
             # Get available data
-            data_info = self.data_connector.get_available_data()
+            if self.use_real_data:
+                data_info = await self.data_connector.get_available_data()
+            else:
+                data_info = self.data_connector.get_available_data()
             
             if not data_info:
                 return {"status": "error", "error": "No data info available"}
             
             # Test data retrieval for each symbol/interval
             test_results = {}
-            for symbol in data_info['statistics']['symbols']:
-                for interval in data_info['statistics']['intervals']:
+            if self.use_real_data:
+                # For real data, access manifest structure
+                statistics = data_info.get('manifest', {}).get('statistics', {})
+            else:
+                # For test data, access direct structure
+                statistics = data_info.get('statistics', {})
+            
+            for symbol in statistics.get('symbols', []):
+                for interval in statistics.get('intervals', []):
                     logger.info(f"Testing {symbol} {interval}...")
                     
                     if self.use_real_data:
@@ -145,7 +155,7 @@ class SimplePhase4Test:
             
             return {
                 "status": "success",
-                "data_info": data_info['statistics'],
+                "data_info": statistics,
                 "test_results": test_results
             }
             
@@ -247,7 +257,10 @@ class SimplePhase4Test:
             logger.info("Testing strategy simulation...")
             
             # Get data for strategy testing
-            btc_data = self.data_connector.get_symbol_data("BTCUSDT", "1h", limit=200)
+            if self.use_real_data:
+                btc_data = await self.data_connector.get_symbol_data("BTCUSDT", "1h", limit=200)
+            else:
+                btc_data = self.data_connector.get_symbol_data("BTCUSDT", "1h", limit=200)
             
             if btc_data is None or btc_data.empty:
                 return {"status": "error", "error": "Failed to get BTC data for strategy testing"}
