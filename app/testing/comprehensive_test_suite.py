@@ -535,6 +535,22 @@ class ComprehensiveTestSuite(TestSuite):
             skip_if_missing=False,
         )
 
+        # Test pytest collection and execution
+        self.run_test(
+            component,
+            "Pytest Collection",
+            lambda: self._validate_pytest_collection(),
+            skip_if_missing=False,
+        )
+
+        # Test pytest execution
+        self.run_test(
+            component,
+            "Pytest Execution",
+            lambda: self._validate_pytest_execution(),
+            skip_if_missing=False,
+        )
+
     def _validate_size_guard(self) -> bool:
         """Validate that all files are within size guard limits"""
         MAX_BYTES = 81920  # 80 KB
@@ -649,6 +665,68 @@ class ComprehensiveTestSuite(TestSuite):
             return True
         except Exception as e:
             logger.error(f"Black validation failed: {e}")
+            return False
+
+    def _validate_pytest_collection(self) -> bool:
+        """Validate that pytest can collect tests without errors"""
+        try:
+            # Run pytest collection only
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", "testing/", "--collect-only", "-q"],
+                capture_output=True,
+                text=True,
+                cwd=".",
+            )
+
+            if result.returncode != 0:
+                logger.error(
+                    f"Pytest collection failed:\n{result.stdout}\n{result.stderr}"
+                )
+                return False
+
+            # Check that tests were collected
+            if "collected 0 items" in result.stdout:
+                logger.error("No tests were collected by pytest")
+                return False
+
+            logger.info(f"Pytest collection successful: {result.stdout.strip()}")
+            return True
+        except Exception as e:
+            logger.error(f"Pytest collection validation failed: {e}")
+            return False
+
+    def _validate_pytest_execution(self) -> bool:
+        """Validate that pytest can execute tests successfully"""
+        try:
+            # Run pytest on basic functionality tests only
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "pytest",
+                    "testing/test_basic_functionality.py",
+                    "-v",
+                ],
+                capture_output=True,
+                text=True,
+                cwd=".",
+            )
+
+            if result.returncode != 0:
+                logger.error(
+                    f"Pytest execution failed:\n{result.stdout}\n{result.stderr}"
+                )
+                return False
+
+            # Check that tests passed
+            if "failed" in result.stdout.lower() or "error" in result.stdout.lower():
+                logger.error("Some pytest tests failed or had errors")
+                return False
+
+            logger.info("Pytest execution successful - all tests passed")
+            return True
+        except Exception as e:
+            logger.error(f"Pytest execution validation failed: {e}")
             return False
 
 
