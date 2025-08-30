@@ -16,13 +16,13 @@ try:
     from .performance_db import StrategyPerformanceDB
     from .strategy_discovery import StrategyDiscoveryEngine, BotType, MarketRegime
     from ..market_analysis.regime_detection import MarketRegimeDetector
-    from ..core.utils import get_current_time
+    from ..core.utils import now_iso
 except ImportError:
     # For direct execution
-    from performance_db import StrategyPerformanceDB
-    from strategy_discovery import StrategyDiscoveryEngine, BotType, MarketRegime
-    from market_analysis.regime_detection import MarketRegimeDetector
-    from core.utils import get_current_time
+    from .performance_db import StrategyPerformanceDB
+    from .strategy_discovery import StrategyDiscoveryEngine, BotType, MarketRegime
+    from ..market_analysis.regime_detection import MarketRegimeDetector
+    from ..core.utils import now_iso
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -163,7 +163,7 @@ class HistoricalAnalysisBot:
             )
 
             return {
-                "timestamp": get_current_time(),
+                "timestamp": now_iso(),
                 "regime_analysis": regime_analysis,
                 "strategy_discoveries": strategy_discoveries,
                 "market_opportunities": market_opportunities,
@@ -686,7 +686,7 @@ class HistoricalAnalysisBot:
     def get_analysis_summary(self) -> Dict[str, Any]:
         """Get summary of historical analysis results"""
         return {
-            "timestamp": get_current_time(),
+            "timestamp": now_iso(),
             "total_capital": self.total_capital,
             "analysis_status": "completed" if self.bot_recommendations else "pending",
             "discovered_strategies": len(self.strategy_discoveries),
@@ -758,7 +758,7 @@ class DynamicBotOrchestrator:
 
             # Step 6: Generate summary
             summary = {
-                "timestamp": get_current_time(),
+                "timestamp": now_iso(),
                 "active_bots": len(self.active_bots),
                 "performance_results": performance_results,
                 "optimization_results": optimization_results,
@@ -935,7 +935,7 @@ class DynamicBotOrchestrator:
     def get_orchestrator_status(self) -> Dict[str, Any]:
         """Get current orchestrator status"""
         return {
-            "timestamp": get_current_time(),
+            "timestamp": now_iso(),
             "total_bots": len(self.active_bots),
             "active_bots": len(
                 [b for b in self.active_bots.values() if b["status"] == "active"]

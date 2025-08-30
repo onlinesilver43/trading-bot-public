@@ -13,11 +13,11 @@ from typing import Dict, Any
 import json
 
 # Import only the test data connector that we know works
-from strategy.test_local_data_connector import TestDataConnector
+from .strategy.test_local_data_connector import TestDataConnector
 
 # Try to import the collected data connector for real data testing
 try:
-    from strategy.collected_data_connector import CollectedDataConnector
+    from .strategy.collected_data_connector import CollectedDataConnector
 
     REAL_DATA_AVAILABLE = True
 except ImportError:

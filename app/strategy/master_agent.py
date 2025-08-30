@@ -14,7 +14,7 @@ import json
 
 from .performance_db import StrategyPerformanceDB
 from ..market_analysis.regime_detection import MarketRegimeDetector
-from ..core.utils import get_current_time
+from ..core.utils import now_iso
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -177,7 +177,7 @@ class MasterAgent:
             self.current_regime = current_regime
             self.regime_history.append(
                 {
-                    "timestamp": get_current_time(),
+                    "timestamp": now_iso(),
                     "regime": current_regime.value,
                     "confidence": regime_data.get("confidence", 0.0),
                 }
@@ -474,7 +474,7 @@ class MasterAgent:
 
             # Record allocation decision
             allocation_record = {
-                "timestamp": get_current_time(),
+                "timestamp": now_iso(),
                 "market_regime": (
                     self.current_regime.value if self.current_regime else "unknown"
                 ),
@@ -533,7 +533,7 @@ class MasterAgent:
 
             # Step 6: Generate summary
             summary = {
-                "timestamp": get_current_time(),
+                "timestamp": now_iso(),
                 "market_regime": market_regime.value,
                 "total_capital": self.total_capital,
                 "allocated_capital": self.allocated_capital,
@@ -559,7 +559,7 @@ class MasterAgent:
         except Exception as e:
             logger.error("Error in optimization cycle: %s", str(e))
             return {
-                "timestamp": get_current_time(),
+                "timestamp": now_iso(),
                 "error": str(e),
                 "status": "failed",
             }
@@ -567,7 +567,7 @@ class MasterAgent:
     def get_system_status(self) -> Dict[str, Any]:
         """Get current system status and metrics"""
         return {
-            "timestamp": get_current_time(),
+            "timestamp": now_iso(),
             "total_capital": self.total_capital,
             "allocated_capital": self.allocated_capital,
             "utilization_rate": (
@@ -597,7 +597,7 @@ class MasterAgent:
             filename = f"master_agent_state_{timestamp}.json"
 
         state_data = {
-            "timestamp": get_current_time(),
+            "timestamp": now_iso(),
             "total_capital": self.total_capital,
             "allocated_capital": self.allocated_capital,
             "current_regime": (

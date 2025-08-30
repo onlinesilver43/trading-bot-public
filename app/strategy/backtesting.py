@@ -9,10 +9,10 @@ import logging
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
-from strategy.sma_crossover import decide, indicators
-from strategy.performance_db import StrategyPerformanceDB, TradeRecord
-from market_analysis.regime_detection import MarketRegimeDetector
-from data_collection.data_preprocessor import DataPreprocessor, OHLCVData
+from .sma_crossover import decide, indicators
+from .performance_db import StrategyPerformanceDB, TradeRecord
+from ..market_analysis.regime_detection import MarketRegimeDetector
+from ..data_collection.data_preprocessor import DataPreprocessor, OHLCVData
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -435,7 +435,7 @@ class BacktestingEngine:
         """Save backtest results to performance database"""
         try:
             # Calculate performance metrics for database
-            from strategy.performance_db import PerformanceMetrics
+            from .performance_db import PerformanceMetrics
 
             metrics = PerformanceMetrics(
                 strategy_name=result.config.strategy_name,

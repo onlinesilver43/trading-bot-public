@@ -11,10 +11,10 @@ from typing import Dict, Any
 import json
 
 # Import our test components
-from strategy.test_local_data_connector import TestDataConnector
-from strategy.historical_data_analyzer import HistoricalDataAnalyzer
-from strategy.master_agent import MasterAgent
-from strategy.dynamic_bot_orchestrator import DynamicBotOrchestrator
+from .strategy.test_local_data_connector import TestDataConnector
+from .strategy.historical_data_analyzer import HistoricalDataAnalyzer
+from .strategy.master_agent import MasterAgent
+from .strategy.dynamic_bot_orchestrator import DynamicBotOrchestrator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
