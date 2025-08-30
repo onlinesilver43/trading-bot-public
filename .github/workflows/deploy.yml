@@ -43,9 +43,11 @@ jobs:
             tar -xzf package.tgz
             rm -f package.tgz
 
-            # Sync repo -> live (preserve data/logs/.env)
+            # Sync repo -> live (preserve data/logs/.env AND all collected data)
             rsync -a --delete --delete-delay --force \
               --exclude data --exclude logs --exclude .env --exclude _diag/ \
+              --exclude history --exclude exports --exclude config \
+              --exclude scripts --exclude history_fetcher \
               "$REPO"/ "$LIVE"/
 
             # Write .env AFTER rsync so --delete won't remove it
