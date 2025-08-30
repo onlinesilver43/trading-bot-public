@@ -100,16 +100,17 @@ def update_manifest():
                         if interval_dir not in statistics['intervals']:
                             statistics['intervals'][interval_dir] = 0
                         
+                        # Scan year-month directories
                         for year_dir in os.listdir(interval_path):
                             year_path = os.path.join(interval_path, year_dir)
                             if os.path.isdir(year_path):
-                                for file in os.listdir(year_path):
-                                    if file.endswith('.parquet'):
-                                        file_path = os.path.join(year_path, file)
+                                for filename in os.listdir(year_path):
+                                    if filename.endswith('.parquet'):
+                                        file_path = os.path.join(year_path, filename)
                                         file_size = os.path.getsize(file_path)
                                         
                                         file_info = {
-                                            'filename': file,
+                                            'filename': filename,
                                             'file_type': 'parquet',
                                             'date': year_dir,
                                             'size_bytes': file_size,
