@@ -8,4 +8,4 @@ Provides access to data preprocessing and historical data collection.
 from .data_preprocessor import DataPreprocessor  # noqa: F401
 
 # Historical data collection
-from .historical_data import HistoricalDataCollector  # noqa: F401
+from .historical_data import HistoricalDataCollector, DataCollectionConfig  # noqa: F401

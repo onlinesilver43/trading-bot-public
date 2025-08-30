@@ -1,27 +1,27 @@
 # Current Plan & Priorities 🎯
 
-## **🚨 IMMEDIATE PRIORITY: Fix GitHub Actions CI Failure**
+## **🚨 IMMEDIATE PRIORITY: Fix Test and Validate Workflow**
 
 ### **Current Issue:**
-- GitHub Actions CI failing with exit code 1
-- Root cause: `comprehensive_test_suite.py` exceeded size guard limits (80 KB, 1,200 lines)
-- **Status**: 🔄 IN PROGRESS - Test suite refactoring completed, fixing import issues
+- Test and Validate workflow failing due to pytest collection errors
+- Root cause: Pytest trying to run test infrastructure files as actual tests
+- **Status**: 🔄 IN PROGRESS - CI workflow now passing, Test and Validate workflow needs fixing
 
 ### **✅ Completed:**
-1. **Test Suite Refactoring**: Split large file into modular structure
-2. **New Infrastructure**: Created `test_infrastructure.py` with common utilities
-3. **Size Reduction**: Reduced from 42,932 bytes/1,267 lines to 349 lines
-4. **Modular Design**: Implemented clean, maintainable test architecture
+1. **CI Workflow**: ✅ **NOW PASSING** - All size guard, syntax, Ruff, Black checks successful
+2. **Test Suite Refactoring**: ✅ **COMPLETED** - Robust import handling with CI workflow integration
+3. **Code Quality**: ✅ **EXCELLENT** - All linting and formatting issues resolved
+4. **File Size Limits**: ✅ **WITHIN LIMITS** - Comprehensive test suite (598 lines, 23KB) well under CI limits
 
 ### **🔄 Current Work:**
-1. **Import Path Issues**: Resolving `ModuleNotFoundError` in refactored test suite
-2. **Test Execution**: Ensuring refactored test suite runs successfully
-3. **CI Validation**: Verifying all tests pass and CI workflow succeeds
+1. **Test and Validate Workflow**: Fixing pytest collection errors
+2. **Import Issues**: Resolving missing DataCollectionConfig import in test_collector.py
+3. **Pytest Configuration**: Configuring pytest to ignore test infrastructure files
 
 ### **Next Steps:**
-1. **Complete Import Fixes**: Resolve remaining module import issues
-2. **Test Suite Validation**: Run comprehensive test suite successfully
-3. **CI Workflow Test**: Ensure GitHub Actions will pass
+1. **Fix Pytest Collection Errors**: Resolve import issues and configure pytest properly
+2. **Test and Validate Workflow**: Ensure Test and Validate workflow passes
+3. **All Workflows Passing**: Verify all GitHub Actions workflows are successful
 4. **Branch Merge**: Create PR and merge to main
 5. **Phase 5**: Begin next development phase
 
