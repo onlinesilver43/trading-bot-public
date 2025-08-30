@@ -43,7 +43,11 @@ python3 scripts/collect_historical_data.py
 - ✅ Volume mount issue RESOLVED - Docker container path conflict fixed
 - ✅ Enhanced test framework successfully deployed
 - ✅ Git conflicts resolved and enhanced framework pushed
-- 🔄 CI workflow testing IN PROGRESS - 80 Ruff issues auto-fixed, 39 remaining
+- ✅ CI workflow testing COMPLETED - All 39 Ruff linting issues resolved
+- ✅ Import issues FIXED - BacktestingEngine and sma_crossover imports corrected
+- ✅ Virtual environment properly configured with all dependencies
+- ✅ Local CI tests all passing
+- ❌ GitHub Actions CI workflow failed (exit code 1) - needs investigation
 - ✅ BTCUSDT 1h: 67 files collected (complete)
 - ✅ ETHUSDT 1h: 67 files collected (complete)
 - ✅ BTCUSDT 5m: 67 files collected (complete)
@@ -51,54 +55,44 @@ python3 scripts/collect_historical_data.py
 - ✅ Total: 268 files, 66 MB - ALL DATA COLLECTION COMPLETE
 
 ### Next Steps After Data Collection
-1. **Complete CI Workflow Cleanup** 🔄 **IN PROGRESS**
-   ```bash
-   cd app
-   ../.venv/bin/python3 -m ruff check . --output-format=concise
-   ../.venv/bin/python3 -m ruff check . --fix
-   ```
+1. **Investigate GitHub Actions CI Failure** 🔍 **IMMEDIATE**
+   - Check GitHub Actions logs for specific error
+   - Identify what caused the workflow to fail
+   - Determine if it's a code issue or workflow configuration issue
 
-2. **Verify All Workflows Pass** 🔄 **NEXT**
-   ```bash
-   ../.venv/bin/python3 -m ruff check .
-   ../.venv/bin/python3 -m black --check .
-   ../.venv/bin/python3 -m py_compile .
-   ```
+2. **Fix Remaining Issues** 🔧 **NEXT**
+   - Address any problems found in CI logs
+   - Ensure all code quality standards are met
+   - Test fixes locally before re-running CI
 
-3. **Test Docker Build** 🔄 **PENDING**
-   ```bash
-   cd /mnt/c/tradingBot/repo
-   docker build -t tb-app-ci app
-   ```
+3. **Verify CI Success** ✅ **GOAL**
+   - Re-run GitHub Actions workflow
+   - Confirm all checks pass
+   - Ensure branch is ready for merge
 
-4. **Prepare for Merge** 🚀 **GOAL**
-   - Verify all CI workflows pass
+4. **Prepare for Merge** 🚀 **FINAL**
    - Create merge request
    - Merge feature/reorganized-codebase to main
+   - Begin Phase 5 development
 
 ### Key Commands for Next Session
 ```bash
-# Complete CI workflow cleanup
+# Verify all workflows pass locally
 cd app
-../.venv/bin/python3 -m ruff check . --output-format=concise
-../.venv/bin/python3 -m ruff check . --fix
+source ../.venv/bin/activate
+python3 -m ruff check .
+python3 -m black --check .
+find . -name "*.py" -exec python3 -m py_compile {} \;
 
-# Test Docker build
-cd /mnt/c/tradingBot/repo
-docker build -t tb-app-ci app
-
-# Verify all workflows pass
-cd app
-../.venv/bin/python3 -m ruff check .
-../.venv/bin/python3 -m black --check .
-../.venv/bin/python3 -m py_compile .
+# Test simple Phase 4 test
+python3 simple_phase4_test.py
 ```
 
 ### Expected Results
-- CI workflow cleanup completes successfully
-- All remaining 39 Ruff linting issues resolved
-- Docker build test passes
-- All CI workflow tests pass locally
+- GitHub Actions CI failure investigation completed
+- Specific error identified and understood
+- All remaining issues fixed
+- CI workflow re-run and passes successfully
 - Branch ready for merge to main
 
 ## 🔧 Common Issues & Solutions
@@ -122,12 +116,19 @@ sshpass -f ~/.ssh/tb_pw ssh tb "find /srv/trading-bots/history/parquet/ -name '*
 sshpass -f ~/.ssh/tb_pw ssh tb "du -sh /srv/trading-bots/history/parquet/*"
 ```
 
+### CI Workflow Issues
+If GitHub Actions CI fails while local tests pass:
+1. Check GitHub Actions logs for specific error
+2. Compare local vs remote environment differences
+3. Fix any issues found in CI logs
+4. Re-run workflow to verify success
+
 ## 🎯 Next Steps After Data Collection - ALL DATA COLLECTION COMPLETE
 
-1. **Complete CI Workflow Cleanup** 🔄 **IN PROGRESS** - Resolve remaining 39 Ruff linting issues
-2. **Verify All Workflows Pass** 🔄 **NEXT** - Test all CI workflow tests locally
-3. **Test Docker Build** 🔄 **PENDING** - Ensure Docker build test passes
-4. **Prepare for Merge** 🚀 **GOAL** - Get branch into mergable state
+1. **Investigate GitHub Actions CI Failure** 🔍 **IMMEDIATE** - Check CI logs for specific error
+2. **Fix Remaining Issues** 🔧 **NEXT** - Address any problems found by CI workflow
+3. **Verify CI Success** ✅ **GOAL** - Re-run workflow to verify all checks pass
+4. **Prepare for Merge** 🚀 **FINAL** - Get branch into mergable state
 
 ## 📋 Script Usage
 
@@ -152,4 +153,8 @@ python3 scripts/collect_historical_data.py --symbol BTCUSDT --interval 1h
 - **Volume mount issue RESOLVED** - Docker container path conflict fixed
 - **File storage VERIFIED** - Data properly accessible on host system
 - **ALL DATA COLLECTION COMPLETE** - 268 files, 66 MB total
-- **CI WORKFLOW CLEANUP IN PROGRESS** - 80 issues auto-fixed, 39 remaining
+- **CI WORKFLOW CLEANUP COMPLETED** - All 39 Ruff linting issues resolved
+- **IMPORT ISSUES FIXED** - BacktestingEngine and sma_crossover imports corrected
+- **LOCAL CI TESTS PASSING** - All local CI workflow tests passing
+- **GITHUB ACTIONS CI FAILED** - Exit code 1, needs investigation
+- **NEXT PRIORITY** - Investigate CI failure, fix remaining issues, get CI passing
